@@ -21,9 +21,9 @@ typedef struct Column {
 typedef struct {
     char numeTabel[100];
     Column coloane[1024];
-    int numarColoane;
+    int numarColoane ;
     void** randuri;  
-    int numarRanduri;
+    int numarRanduri ;
 } Table;
 
 Column* creazaColoana(const char* numeCol, DataType type, int varchar_length);
