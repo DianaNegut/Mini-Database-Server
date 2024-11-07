@@ -3,77 +3,71 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include "gestionareTabele.h"
+#include "SQLParser.h"
 
-#define PORT 8082
+#define PORT 8084
 #define BUFFER_SIZE 1024
 
-Table *createTabel(char *buffer)
-{
-    Table *t = (Table *)malloc(sizeof(Table));
-    memset(t, 0, sizeof(Table));
-    char numeTabel[BUFFER_SIZE];
-    char *token = strtok(buffer + 7, " ");
-    if (token != NULL)
-    {
-        strncpy(numeTabel, token, BUFFER_SIZE - 1);
-        numeTabel[BUFFER_SIZE - 1] = '\0';
-        strncpy(t->numeTabel, numeTabel, sizeof(t->numeTabel) - 1);
-        t->numeTabel[sizeof(t->numeTabel) - 1] = '\0';
-        token = strtok(NULL, " ");
-        t->numarColoane = 0;
-        t->numarRanduri = 0;
-        while (token != NULL)
-        {
-            char *tipColoana = token;
-            token = strtok(NULL, " ");
-            if (token == NULL)
-            {
-                break;
-            }
-            if (strcmp(tipColoana, "INT") == 0)
-            {
-                t->coloane[t->numarColoane].tipDate = INT;
-                t->coloane[t->numarColoane].varchar_length = 0;
-            }
-            else if (strcmp(tipColoana, "VARCHAR") == 0)
-            {
-                t->coloane[t->numarColoane].tipDate = VARCHAR;
-                t->coloane[t->numarColoane].varchar_length = 255;
-            }
-            else if (strcmp(tipColoana, "DATE") == 0)
-            {
-                t->coloane[t->numarColoane].tipDate = DATE;
-                t->coloane[t->numarColoane].varchar_length = 0;
-            }
-            char aux[BUFFER_SIZE];
+// Table* parseCreateTable(char* buffer) {
+//     Table *t = (Table *)malloc(sizeof(Table));
+//     memset(t, 0, sizeof(Table));
 
-            strcpy(aux, token);
-            int len = strlen(aux);
-            if (len > 0 && (aux[len - 1] == '\n' || aux[len - 1] == '\r'))
-            {
-                aux[len - 1] = '\0';
-            }
-            len = strlen(aux);
-            if (len > 0 && (aux[len - 1] == '\n' || aux[len - 1] == '\r'))
-            {
-                aux[len - 1] = '\0';
-            }
+//     // Tokenize the SQL query and parse the table creation logic
+//     char *token = strtok(buffer + 7, " ");  // Skip "CREATE" and "TABLE"
+//     if (token != NULL) {
+//         // Parse table name
+//         strncpy(t->numeTabel, token, sizeof(t->numeTabel) - 1);
+//         t->numeTabel[sizeof(t->numeTabel) - 1] = '\0';
 
-            aux[strlen(aux)] = 0;
-            strcpy(t->coloane[t->numarColoane].numeColoana, aux);
-            t->numarColoane++;
-            token = strtok(NULL, " ");
-        }
-    }
-    return t;
-}
+//         // Initialize number of columns
+//         t->numarColoane = 0;
+
+//         // Parse columns and types
+//         token = strtok(NULL, " ");
+//         while (token != NULL) {
+//             char *columnType = token;
+//             token = strtok(NULL, " ");
+//             if (token == NULL) break;
+
+//             if (strcmp(columnType, "INT") == 0) {
+//                 t->coloane[t->numarColoane].tipDate = INT;
+//                 t->coloane[t->numarColoane].varchar_length = 0;
+//             }
+//             else if (strcmp(columnType, "VARCHAR") == 0) {
+//                 t->coloane[t->numarColoane].tipDate = VARCHAR;
+//                 t->coloane[t->numarColoane].varchar_length = 255;
+//             }
+//             else if (strcmp(columnType, "DATE") == 0) {
+//                 t->coloane[t->numarColoane].tipDate = DATE;
+//                 t->coloane[t->numarColoane].varchar_length = 0;
+//             }
+
+//             // Extract column name
+//             token = strtok(NULL, " ");
+//             strcpy(t->coloane[t->numarColoane].numeColoana, token);
+//             t->numarColoane++;
+//             token = strtok(NULL, " ");
+//         }
+//     }
+
+//     return t;
+// }
 
 void handleClient(int clientSocket)
 {
     char buffer[BUFFER_SIZE];
     int bytesRead;
+    Table *tabel = NULL;
 
+    // Inițializare parser
+    SQLParser *parser = (SQLParser *)malloc(sizeof(SQLParser));
+    if (parser == NULL)
+    {
+        printf("Eroare la alocarea memoriei pentru SQLParser.\n");
+        return;
+    }
+    initSQLParser(parser);
+    char titleTabel[30];
     while ((bytesRead = read(clientSocket, buffer, sizeof(buffer) - 1)) > 0)
     {
         int len = strlen(buffer);
@@ -81,38 +75,53 @@ void handleClient(int clientSocket)
         {
             buffer[len - 1] = '\0';
         }
-        Table *tabel;
-        if (strncmp(buffer, "CREATE", 6) == 0)
+        char tableName[40];
+        int switching = parser->parse(parser, buffer, tableName);
+
+        switch (switching)
         {
-            tabel = createTabel(buffer);
-            if (tabel)
+        case 0:
+        { 
+            char **columns = parser->parseSelect(parser, buffer, titleTabel);
+            if (columns != NULL)
             {
-                write(clientSocket, "Tabel creat cu succes!", strlen("Tabel creat cu succes!"));
+                for (int i = 0; i < 3; i++)
+                {
+                    if (columns[i] != NULL)
+                    {
+                        printf("Coloana %d: %s\n", i + 1, columns[i]);
+                        free(columns[i]); 
+                    }
+                }
+                free(columns);
             }
             else
             {
-                write(clientSocket, "Eroare la crearea tabelului!", strlen("Eroare la crearea tabelului!"));
+                printf("Eroare la procesarea coloanelor.\n");
             }
+            break;
         }
-        else if (strncmp(buffer, "SELECT * FROM", 13) == 0)
-        {
-            char filename[BUFFER_SIZE];
-            sscanf(buffer + 14, "%s", filename);
-            write(clientSocket, "Se va afisa tabelul dorit!", strlen("Se va afisa tabelul dorit!"));
+        case 2:
+        { // INSERT
+            break;
         }
-        else if (strncmp(buffer, "SAVE", 4) == 0)
-        {
-            char filename[BUFFER_SIZE];
-            sscanf(buffer + 5, "%s", filename);
-            salveazaTabel(tabel, filename);
-            write(clientSocket, "Tabel salvat cu succes!", strlen("Tabel salvat cu succes!"));
+        case 3:
+        { // UPDATE
+            break;
         }
-        else
-        {
-            write(clientSocket, "Comandă necunoscută!", strlen("Comandă necunoscută!"));
+        case 1:
+        { // CREATE
+            break;
+        }
+        case 4:
+        { // DELETE
+            break;
+        }
+        default:
+            printf("Comandă necunoscută: %s\n", buffer);
+            break;
         }
     }
-
     close(clientSocket);
 }
 
