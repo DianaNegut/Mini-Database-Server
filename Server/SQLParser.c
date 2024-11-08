@@ -4,6 +4,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 #include "SQLParser.h"
 
 void initSQLParser(SQLParser *parser)
@@ -102,8 +105,7 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName)
     return columns;
 }
 
-bool exists_in_master(const char *master_filename, const char *entry)
-{
+bool exists_in_master(const char *master_filename, const char *entry){
     FILE *file = fopen(master_filename, "r");
     if (file == NULL)
     {
@@ -124,14 +126,63 @@ bool exists_in_master(const char *master_filename, const char *entry)
     return false;
 }
 
-Column *parseInsert(SQLParser *parser, char *stream)
+
+void append_to_file_values(const char *filename, char values[][MAX_LENGTH], int num_values) {
+    int fd = open(filename, O_WRONLY | O_APPEND);
+    if (fd == -1) {
+        perror("Eroare la deschiderea fișierului");
+        return;
+    }
+    for (int i = 0; i < num_values; i++) {
+        // Scriem valoarea în fișier
+        if (write(fd, values[i], strlen(values[i])) == -1) {
+            perror("Eroare la scrierea valorii în fișier");
+            close(fd);
+            return;
+        }
+        if (i < num_values - 1) {
+            if (write(fd, " ", 1) == -1) {
+                perror("Eroare la adăugarea spațiului");
+                close(fd);
+                return;
+            }
+        }
+    }
+    if (write(fd, "\n", 1) == -1) {
+        perror("Eroare la adăugarea newline-ului");
+        close(fd);
+        return;
+    }
+    if (close(fd) == -1) {
+        perror("Eroare la închiderea fișierului");
+    }
+}
+
+void cleanBuffer(char *buffer) {
+    char *src = buffer;
+    char *dst = buffer;
+    
+    while (*src) {
+        if (*src != '\000') {  
+            *dst++ = *src;  
+        }
+        src++;
+    }
+    *dst = '\0';  
+}
+
+void parseInsert(SQLParser *parser, char *stream)
 {
-    Column coloane[20];
+    char insert[MAX_LENGTH];
     char into[MAX_LENGTH], table[MAX_LENGTH];
     char columns[MAX_COLUMNS][MAX_LENGTH];
     char values[MAX_VALUES][MAX_LENGTH];
     int col = 0, val = 0;
-    sscanf(stream, "%s %s", into, table);
+    cleanBuffer(stream);
+    sscanf(stream, "%s%s%s", insert, into, table);
+    cleanBuffer(insert);
+    cleanBuffer(into);
+    cleanBuffer(table);
     if (!exists_in_master("master", table))
     {
         perror("Eroare, tabelul nu exista in baza de date!");
@@ -170,17 +221,18 @@ Column *parseInsert(SQLParser *parser, char *stream)
         }
 
         printf("\nValues: ");
+
         for (int i = 0; i < val; i++)
         {
             printf("%s ", values[i]);
         }
+        append_to_file_values(table, values, val);
         printf("\n");
     }
     else
     {
         printf("Invalid INSERT syntax.\n");
     }
-    return coloane;
 }
 
 void parseUpdate(SQLParser *parser, char *stream)
@@ -216,8 +268,7 @@ void parseUpdate(SQLParser *parser, char *stream)
     printf("UPDATE command: Table = %s, Set = %s, Condition = %s\n", table, set, condition);
 }
 
-void append_to_file(const char *filename, const char *text)
-{
+void append_to_file(const char *filename, const char *text){
     int fd = open(filename, O_WRONLY | O_APPEND);
     if (fd == -1)
     {
@@ -243,6 +294,20 @@ void append_to_file(const char *filename, const char *text)
     }
 }
 
+
+void creareFisier(const char* filename)
+{
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);  
+    if (fd == -1) {
+        perror("Eroare la crearea fișierului");
+        return 1;  
+    }
+    if (close(fd) == -1) {
+        perror("Eroare la închiderea fișierului");
+        return 1;  
+    }
+}
+
 Table *parseCreateTable(SQLParser *parser, char *stream)
 {
     Table *t = (Table *)malloc(sizeof(Table));
@@ -256,6 +321,7 @@ Table *parseCreateTable(SQLParser *parser, char *stream)
     char numeColoane[20][40];
     char tipuriDate[20][10];
     strcpy(t->numeTabel, numeTabel);
+    creareFisier(t->numeTabel);
     if (!exists_in_master("master", t->numeTabel))
         append_to_file("master", t->numeTabel);
     while ((token = strtok(NULL, " ,()")) != NULL)

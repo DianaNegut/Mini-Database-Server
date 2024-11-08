@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include "SQLParser.h"
 
-#define PORT 8084
+#define PORT 8095
 #define BUFFER_SIZE 1024
 
 // Table* parseCreateTable(char* buffer) {
@@ -68,8 +68,14 @@ void handleClient(int clientSocket)
     char titleTabel[30];
     while ((bytesRead = read(clientSocket, buffer, sizeof(buffer) - 1)) > 0)
     {
+        buffer[bytesRead] = '\0';
         int len = strlen(buffer);
         if (len > 0 && buffer[len - 1] == '\n')
+        {
+            buffer[len - 1] = '\0';
+        }
+        len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] == '\r')
         {
             buffer[len - 1] = '\0';
         }
@@ -99,20 +105,22 @@ void handleClient(int clientSocket)
             }
             break;
         }
-        case 2:
+        case 1:
         { // INSERT
+            parseInsert(parser, buffer);
             break;
         }
-        case 3:
+        case 2:
         { // UPDATE
             break;
         }
-        case 1:
-        { // CREATE
+        case 3:
+        { // DELETE
             break;
         }
         case 4:
-        { // DELETE
+        { // CREATE
+            tabel = parseCreateTable(parser,buffer);
             break;
         }
         default:
