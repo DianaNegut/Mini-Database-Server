@@ -14,13 +14,13 @@ typedef enum {
 
 typedef struct Column {
     char numeColoana[100];
-    DataType tipDate;
+    char tipDate[10];
     int varchar_length;
 } Column;
 
 typedef struct {
     char numeTabel[100];
-    Column coloane[1024];
+    Column* coloane;
     int numarColoane ;
     void** randuri;  
     int numarRanduri ;

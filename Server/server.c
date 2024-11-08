@@ -58,8 +58,6 @@ void handleClient(int clientSocket)
     char buffer[BUFFER_SIZE];
     int bytesRead;
     Table *tabel = NULL;
-
-    // Inițializare parser
     SQLParser *parser = (SQLParser *)malloc(sizeof(SQLParser));
     if (parser == NULL)
     {
@@ -76,7 +74,7 @@ void handleClient(int clientSocket)
             buffer[len - 1] = '\0';
         }
         char tableName[40];
-        int switching = parser->parse(parser, buffer, tableName);
+        int switching = parser->parse(parser, buffer);
 
         switch (switching)
         {

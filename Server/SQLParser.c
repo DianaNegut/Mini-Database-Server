@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdbool.h>
 #include "SQLParser.h"
 
 void initSQLParser(SQLParser *parser)
@@ -13,7 +16,7 @@ void initSQLParser(SQLParser *parser)
     parser->parseCreateTable = parseCreateTable;
 }
 
-int parse(SQLParser *parser, const char *query, char* title)
+int parse(SQLParser *parser, const char *query)
 {
     char command[MAX_LENGTH];
     char stream[MAX_LENGTH];
@@ -27,27 +30,22 @@ int parse(SQLParser *parser, const char *query, char* title)
 
     if (strcmp(command, "SELECT") == 0)
     {
-        parser->parseSelect(parser, stream,title);
         return 0;
     }
     else if (strcmp(command, "INSERT") == 0)
     {
-        parser->parseInsert(parser, stream);
         return 1;
     }
     else if (strcmp(command, "UPDATE") == 0)
     {
-        parser->parseUpdate(parser, stream);
         return 2;
     }
     else if (strcmp(command, "DELETE") == 0)
     {
-        parser->parseDelete(parser, stream);
         return 3;
     }
     else if (strcmp(command, "CREATE") == 0)
     {
-        parser->parseCreateTable(parser, stream);
         return 4;
     }
     else
@@ -57,20 +55,23 @@ int parse(SQLParser *parser, const char *query, char* title)
     }
 }
 
-char** parseSelect(SQLParser *parser, char *stream,char* tableName)
+char **parseSelect(SQLParser *parser, char *stream, char *tableName)
 {
-    char** columns = (char**)malloc(MAX_COLUMNS * sizeof(char*));
-    if (columns == NULL) {
+    char **columns = (char **)malloc(MAX_COLUMNS * sizeof(char *));
+    if (columns == NULL)
+    {
         printf("Eroare la alocarea memoriei pentru coloane.\n");
         return NULL;
     }
 
     int colCount = 0;
-    char* token = strtok(stream, " ");
+    char *token = strtok(stream, " ");
     token = strtok(NULL, " ");
-    while (token != NULL && strcmp(token, "FROM") != 0) {
-        columns[colCount] = (char*)malloc(MAX_LENGTH * sizeof(char));
-        if (columns[colCount] == NULL) {
+    while (token != NULL && strcmp(token, "FROM") != 0)
+    {
+        columns[colCount] = (char *)malloc(MAX_LENGTH * sizeof(char));
+        if (columns[colCount] == NULL)
+        {
             printf("Eroare la alocarea memoriei pentru coloană.\n");
             return NULL;
         }
@@ -78,7 +79,8 @@ char** parseSelect(SQLParser *parser, char *stream,char* tableName)
         columns[colCount][MAX_LENGTH - 1] = '\0';
 
         int len = strlen(columns[colCount]);
-        if (columns[colCount][len - 1] == ',') {
+        if (columns[colCount][len - 1] == ',')
+        {
             columns[colCount][len - 1] = '\0';
         }
 
@@ -91,7 +93,8 @@ char** parseSelect(SQLParser *parser, char *stream,char* tableName)
     strncpy(table, token, MAX_LENGTH - 1);
     strcpy(tableName, table);
     printf("SELECT command: Columns = ");
-    for (int i = 0; i < colCount; i++) {
+    for (int i = 0; i < colCount; i++)
+    {
         printf("%s ", columns[i]);
     }
     printf(", Table = %s\n", table);
@@ -99,7 +102,29 @@ char** parseSelect(SQLParser *parser, char *stream,char* tableName)
     return columns;
 }
 
-Column* parseInsert(SQLParser *parser, char *stream)
+bool exists_in_master(const char *master_filename, const char *entry)
+{
+    FILE *file = fopen(master_filename, "r");
+    if (file == NULL)
+    {
+        perror("Eroare la deschiderea fișierului master");
+        return false;
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), file))
+    {
+        line[strcspn(line, "\n")] = 0;
+        if (strcmp(line, entry) == 0)
+        {
+            fclose(file);
+            return true;
+        }
+    }
+    fclose(file);
+    return false;
+}
+
+Column *parseInsert(SQLParser *parser, char *stream)
 {
     Column coloane[20];
     char into[MAX_LENGTH], table[MAX_LENGTH];
@@ -107,6 +132,11 @@ Column* parseInsert(SQLParser *parser, char *stream)
     char values[MAX_VALUES][MAX_LENGTH];
     int col = 0, val = 0;
     sscanf(stream, "%s %s", into, table);
+    if (!exists_in_master("master", table))
+    {
+        perror("Eroare, tabelul nu exista in baza de date!");
+        exit(-1);
+    }
     char *columns_start = strchr(stream, '(');
     char *values_start = strstr(stream, "VALUES");
     if (columns_start && values_start)
@@ -159,6 +189,11 @@ void parseUpdate(SQLParser *parser, char *stream)
     char set[MAX_LENGTH] = "";
     char condition[MAX_LENGTH] = "";
     sscanf(stream, "%s", table);
+    if (!exists_in_master("master", table))
+    {
+        perror("Eroare, tabelul nu exista in baza de date!");
+        exit(-1);
+    }
     char *set_start = strstr(stream, "SET");
     if (set_start != NULL)
     {
@@ -181,27 +216,61 @@ void parseUpdate(SQLParser *parser, char *stream)
     printf("UPDATE command: Table = %s, Set = %s, Condition = %s\n", table, set, condition);
 }
 
-void parseCreateTable(SQLParser *parser, char *stream)
+void append_to_file(const char *filename, const char *text)
 {
+    int fd = open(filename, O_WRONLY | O_APPEND);
+    if (fd == -1)
+    {
+        perror("Eroare la deschiderea fișierului");
+        return;
+    }
+    const char *newline = "\n";
+    if (write(fd, newline, strlen(newline)) == -1)
+    {
+        perror("Eroare la scrierea newline-ului");
+        close(fd);
+        return;
+    }
+    if (write(fd, text, strlen(text)) == -1)
+    {
+        perror("Eroare la scrierea textului");
+        close(fd);
+        return;
+    }
+    if (close(fd) == -1)
+    {
+        perror("Eroare la închiderea fișierului");
+    }
+}
+
+Table *parseCreateTable(SQLParser *parser, char *stream)
+{
+    Table *t = (Table *)malloc(sizeof(Table));
     char *token = strtok(stream, " ");
     token = strtok(NULL, " ");
     token = strtok(NULL, " ");
     char numeTabel[1024];
     strncpy(numeTabel, token, 1024);
+    Column *c = (Column *)malloc(20 * sizeof(Column));
     int numarColoane = 0;
     char numeColoane[20][40];
     char tipuriDate[20][10];
-
+    strcpy(t->numeTabel, numeTabel);
+    if (!exists_in_master("master", t->numeTabel))
+        append_to_file("master", t->numeTabel);
     while ((token = strtok(NULL, " ,()")) != NULL)
     {
+        strncpy(c[numarColoane].numeColoana, token, 40);
         strncpy(numeColoane[numarColoane], token, 40);
         token = strtok(NULL, " ,()");
         if (strcmp(token, "INT") == 0)
         {
+            strcpy(c[numarColoane].tipDate, "INT");
             strcpy(tipuriDate[numarColoane], "INT");
         }
         else if (strcmp(token, "VARCHAR") == 0)
         {
+            strcpy(c[numarColoane].tipDate, "VARCHAR");
             strcpy(tipuriDate[numarColoane], "VARCHAR");
             token = strtok(NULL, " ,()");
             // aici de gestionat daca e varchar
@@ -209,17 +278,23 @@ void parseCreateTable(SQLParser *parser, char *stream)
         }
         else if (strcmp(token, "DATE") == 0)
         {
+            strcpy(c[numarColoane].tipDate, "DATE");
             strcpy(tipuriDate[numarColoane], "DATE");
         }
 
         numarColoane++;
     }
+    t->coloane = c;
+    t->randuri = 0;
+
+    t->numarColoane = numarColoane;
     printf("Tabel creat: %s\n", numeTabel);
     for (int i = 0; i < numarColoane; i++)
     {
         printf("Coloana %d: %s, Tip: ", i + 1, numeColoane[i]);
-        printf("\t%s",tipuriDate[i]);
+        printf("\t%s", tipuriDate[i]);
     }
+    return t;
 }
 
 void parseDelete(SQLParser *parser, char *stream)
@@ -227,6 +302,11 @@ void parseDelete(SQLParser *parser, char *stream)
     char from[MAX_LENGTH], table[MAX_LENGTH];
     char condition[MAX_LENGTH] = "";
     sscanf(stream, "%s %s", from, table);
+    if (!exists_in_master("master", table))
+    {
+        perror("Eroare, tabelul nu exista in baza de date!");
+        exit(-1);
+    }
     char *condition_start = strstr(stream, "WHERE");
     if (condition_start != NULL)
     {
