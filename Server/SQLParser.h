@@ -25,4 +25,5 @@ void parseUpdate(SQLParser* parser, char* stream);
 void parseDelete(SQLParser* parser, char* stream);
 Table* parseCreateTable(SQLParser* parser, char* stream);
 
+
 #endif // SQLPARSER_H

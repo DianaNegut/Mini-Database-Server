@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include "SQLParser.h"
-
-#define PORT 8095
+#include "gestionareTabele.h"
+#define PORT 8105
 #define BUFFER_SIZE 1024
 
 // Table* parseCreateTable(char* buffer) {
@@ -86,24 +86,25 @@ void handleClient(int clientSocket)
         {
         case 0:
         { 
-            char **columns = parser->parseSelect(parser, buffer, titleTabel);
-            if (columns != NULL)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    if (columns[i] != NULL)
-                    {
-                        printf("Coloana %d: %s\n", i + 1, columns[i]);
-                        free(columns[i]); 
-                    }
-                }
-                free(columns);
-            }
-            else
-            {
-                printf("Eroare la procesarea coloanelor.\n");
-            }
-            break;
+            tabel = loadTable("angajati");
+            // char **columns = parser->parseSelect(parser, buffer, titleTabel);
+            // if (columns != NULL)
+            // {
+            //     for (int i = 0; i < 3; i++)
+            //     {
+            //         if (columns[i] != NULL)
+            //         {
+            //             printf("Coloana %d: %s\n", i + 1, columns[i]);
+            //             free(columns[i]); 
+            //         }
+            //     }
+            //     free(columns);
+            // }
+            // else
+            // {
+            //     printf("Eroare la procesarea coloanelor.\n");
+            // }
+            // break;
         }
         case 1:
         { // INSERT

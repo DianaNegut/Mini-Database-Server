@@ -105,7 +105,8 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName)
     return columns;
 }
 
-bool exists_in_master(const char *master_filename, const char *entry){
+bool exists_in_master(const char *master_filename, const char *entry)
+{
     FILE *file = fopen(master_filename, "r");
     if (file == NULL)
     {
@@ -126,49 +127,59 @@ bool exists_in_master(const char *master_filename, const char *entry){
     return false;
 }
 
-
-void append_to_file_values(const char *filename, char values[][MAX_LENGTH], int num_values) {
+void append_to_file_values(const char *filename, char values[][MAX_LENGTH], int num_values)
+{
     int fd = open(filename, O_WRONLY | O_APPEND);
-    if (fd == -1) {
+    if (fd == -1)
+    {
         perror("Eroare la deschiderea fișierului");
         return;
     }
-    for (int i = 0; i < num_values; i++) {
+    for (int i = 0; i < num_values; i++)
+    {
         // Scriem valoarea în fișier
-        if (write(fd, values[i], strlen(values[i])) == -1) {
+        if (write(fd, values[i], strlen(values[i])) == -1)
+        {
             perror("Eroare la scrierea valorii în fișier");
             close(fd);
             return;
         }
-        if (i < num_values - 1) {
-            if (write(fd, " ", 1) == -1) {
+        if (i < num_values - 1)
+        {
+            if (write(fd, " ", 1) == -1)
+            {
                 perror("Eroare la adăugarea spațiului");
                 close(fd);
                 return;
             }
         }
     }
-    if (write(fd, "\n", 1) == -1) {
+    if (write(fd, "\n", 1) == -1)
+    {
         perror("Eroare la adăugarea newline-ului");
         close(fd);
         return;
     }
-    if (close(fd) == -1) {
+    if (close(fd) == -1)
+    {
         perror("Eroare la închiderea fișierului");
     }
 }
 
-void cleanBuffer(char *buffer) {
+void cleanBuffer(char *buffer)
+{
     char *src = buffer;
     char *dst = buffer;
-    
-    while (*src) {
-        if (*src != '\000') {  
-            *dst++ = *src;  
+
+    while (*src)
+    {
+        if (*src != '\000')
+        {
+            *dst++ = *src;
         }
         src++;
     }
-    *dst = '\0';  
+    *dst = '\0';
 }
 
 void parseInsert(SQLParser *parser, char *stream)
@@ -268,7 +279,8 @@ void parseUpdate(SQLParser *parser, char *stream)
     printf("UPDATE command: Table = %s, Set = %s, Condition = %s\n", table, set, condition);
 }
 
-void append_to_file(const char *filename, const char *text){
+void append_to_file(const char *filename, const char *text)
+{
     int fd = open(filename, O_WRONLY | O_APPEND);
     if (fd == -1)
     {
@@ -294,17 +306,18 @@ void append_to_file(const char *filename, const char *text){
     }
 }
 
-
-void creareFisier(const char* filename)
+void creareFisier(const char *filename)
 {
-    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);  
-    if (fd == -1) {
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd == -1)
+    {
         perror("Eroare la crearea fișierului");
-        return 1;  
+        return 1;
     }
-    if (close(fd) == -1) {
+    if (close(fd) == -1)
+    {
         perror("Eroare la închiderea fișierului");
-        return 1;  
+        return 1;
     }
 }
 
@@ -324,7 +337,7 @@ Table *parseCreateTable(SQLParser *parser, char *stream)
     creareFisier(t->numeTabel);
     if (!exists_in_master("master", t->numeTabel))
         append_to_file("master", t->numeTabel);
-    while ((token = strtok(NULL, " ,()")) != NULL)
+    while ((token = strtok(NULL, " ,();")) != NULL)
     {
         strncpy(c[numarColoane].numeColoana, token, 40);
         strncpy(numeColoane[numarColoane], token, 40);
@@ -339,8 +352,16 @@ Table *parseCreateTable(SQLParser *parser, char *stream)
             strcpy(c[numarColoane].tipDate, "VARCHAR");
             strcpy(tipuriDate[numarColoane], "VARCHAR");
             token = strtok(NULL, " ,()");
-            // aici de gestionat daca e varchar
-            // t->coloane[t->numarColoane].varchar_length = atoi(token);
+            if (token != NULL)
+            {
+                int x = atoi(token);
+                c[numarColoane].varchar_length = x;
+
+            }
+            else
+            {
+                printf("Eroare: Token este NULL\n");
+            }
         }
         else if (strcmp(token, "DATE") == 0)
         {
@@ -360,6 +381,7 @@ Table *parseCreateTable(SQLParser *parser, char *stream)
         printf("Coloana %d: %s, Tip: ", i + 1, numeColoane[i]);
         printf("\t%s", tipuriDate[i]);
     }
+    salveazaTabel(t, t->numeTabel);
     return t;
 }
 
