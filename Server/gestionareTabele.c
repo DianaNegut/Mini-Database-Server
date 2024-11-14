@@ -107,6 +107,38 @@ int citesteString(int fd, char *s)
     return 0;
 }
 
+int citesteNumar(int fd, char *s, int *dim)
+{
+    char buffer[1];
+    int index = 0;
+    *dim = 0;
+
+    while (1)
+    {
+        int bytesRead = read(fd, buffer, 1);
+        if (bytesRead <= 0)
+            break;
+
+        if (buffer[0] == '\n' || buffer[0] == ' ')
+        {
+            s[index] = '\0'; 
+            *dim = index;
+            return 1;
+        }
+
+        if (buffer[0] >= '0' && buffer[0] <= '9')
+        {
+            s[index++] = buffer[0];
+        }
+    }
+
+    s[index] = '\0';
+    *dim = index;
+
+    return 0;
+}
+
+
 int citesteInt(int fd)
 {
     char buffer[BUFFER_SIZE];
@@ -172,172 +204,207 @@ void salveazaTabel(Table *tabel, const char *filename)
     close(file);
 }
 
-Table *loadTable(const char *filename)
-{
-    int fd = open(filename, O_RDONLY);
-    if (fd < 0)
-    {
+Table* loadTable(const char* filename) {
+    FILE* fd = fopen(filename, "r");
+    if (fd == NULL) {
         perror("Eroare la deschiderea fișierului");
         return NULL;
     }
 
-    Table *table = (Table *)malloc(sizeof(Table));
-    if (!table)
-    {
+    Table* table = (Table*)malloc(sizeof(Table));
+    if (!table) {
         perror("Eroare la alocarea memoriei pentru tabel");
-        close(fd);
+        fclose(fd);
         return NULL;
     }
     memset(table, 0, sizeof(Table));
 
     char buffer[BUFFER_SIZE];
-    ssize_t bytesRead;
-    char *line;
     int lineNumber = 0;
 
-    while ((bytesRead = read(fd, buffer, BUFFER_SIZE - 1)) > 0)
-    {
-        buffer[bytesRead] = '\0';
-        line = strtok(buffer, "\n");
-        while (line != NULL)
-        {
-            if (lineNumber == 0)
-            {
-                strncpy(table->numeTabel, line, MAX_STRING_LENGTH - 1);
-                table->numeTabel[MAX_STRING_LENGTH - 1] = '\0';
-            }
-            else if (lineNumber == 1)
-            {
-                table->numarColoane = atoi(line);
-                table->coloane = (Column *)malloc(table->numarColoane * sizeof(Column));
-                if (!table->coloane)
-                {
-                    perror("Eroare la alocarea memoriei pentru coloane");
-                    free(table);
-                    close(fd);
-                    return NULL;
-                }
-            }
-            else if (lineNumber == 2)
-            {
-                int colIndex = 0;
-                char *token = strtok(line, " \t");
-                while (token != NULL && colIndex < table->numarColoane)
-                {
-                    strncpy(table->coloane[colIndex].numeColoana, token, MAX_STRING_LENGTH - 1);
-                    table->coloane[colIndex].numeColoana[MAX_STRING_LENGTH - 1] = '\0';
-                    token = strtok(NULL, " \t");
-                    if (token)
-                    {
-                        strcpy(table->coloane[colIndex].tipDate, token);
-                        table->coloane[colIndex].tipDate[9] = '\0';
-                    }
-                    if (strcmp(table->coloane[colIndex].tipDate, "VARCHAR") == 0)
-                    {
-                        table->coloane[colIndex].varchar_length = 50;
-                    }
-                    else
-                    {
-                        table->coloane[colIndex].varchar_length = 0;
-                    }
+    while (fgets(buffer, BUFFER_SIZE, fd)) {
+        buffer[strcspn(buffer, "\n")] = '\0';  
 
-                    colIndex++;
-                    token = strtok(NULL, " ");
-                }
-            }
-            else
-            {
-                if (table->numarRanduri == 0)
-                {
-                    table->randuri = malloc(sizeof(void *) * 10);
-                }
-                else if (table->numarRanduri % 10 == 0)
-                {
-                    table->randuri = realloc(table->randuri, sizeof(void *) * (table->numarRanduri + 10));
-                }
-
-                if (!table->randuri)
-                {
-                    perror("Eroare la alocarea memoriei pentru rânduri");
-                    free(table->coloane);
-                    free(table);
-                    close(fd);
-                    return NULL;
-                }
-                table->randuri[table->numarRanduri] = strdup(line);
-                table->numarRanduri++;
-            }
-
-            line = strtok(NULL, "\n");
-            lineNumber++;
+        if (lineNumber == 0) {
+            strncpy(table->numeTabel, buffer, MAX_STRING_LENGTH - 1);
+            table->numeTabel[MAX_STRING_LENGTH - 1] = '\0';
         }
+        else if (lineNumber == 1) {
+            // A doua linie: numărul de coloane
+            table->numarColoane = atoi(buffer);
+            table->coloane = (Column*)malloc(table->numarColoane * sizeof(Column));
+            if (!table->coloane) {
+                perror("Eroare la alocarea memoriei pentru coloane");
+                free(table);
+                fclose(fd);
+                return NULL;
+            }
+        }
+        else if (lineNumber == 2) {
+            char* token;
+            int colIndex = 0;
+            token = strtok(buffer, " \t");
+            while (token != NULL && colIndex < table->numarColoane) {
+                strncpy(table->coloane[colIndex].numeColoana, token, MAX_STRING_LENGTH - 1);
+                table->coloane[colIndex].numeColoana[MAX_STRING_LENGTH - 1] = '\0';
+
+                token = strtok(NULL, " \t");
+                if (token) {
+                    strncpy(table->coloane[colIndex].tipDate, token, sizeof(table->coloane[colIndex].tipDate) - 1);
+                    table->coloane[colIndex].tipDate[sizeof(table->coloane[colIndex].tipDate) - 1] = '\0';
+                }
+
+                if (strcmp(table->coloane[colIndex].tipDate, "VARCHAR") == 0) {
+                    table->coloane[colIndex].varchar_length = 50;
+                }
+                else {
+                    table->coloane[colIndex].varchar_length = 0;
+                }
+                colIndex++;
+                token = strtok(NULL, " \t");
+            }
+        }
+        else {
+            table->numarRanduri = countLinesInFile(table->numeTabel) - 3;
+
+            Row* newRow = (Row*)malloc(sizeof(Row) * table->numarRanduri);
+            for ( int i= 0; i < table->numarRanduri;i++)
+                newRow[i].elemente = (char*)malloc(table->numarRanduri * table->numarColoane * sizeof(char));
+
+            char* token = strtok(buffer, " \t");
+            for (int i = 0; i < table->numarRanduri ; i++) {
+                for (int j = 0; j < table->numarColoane; j++)
+                {
+                    if (token) {
+                        newRow[i].elemente[j] = strdup(token);
+                        token = strtok(NULL, " \t");
+                    }
+                    else {
+                        newRow[i].elemente[j] = strdup("");
+                    }
+                }
+                fgets(buffer, BUFFER_SIZE, fd);
+                buffer[strcspn(buffer, "\n")] = '\0';
+                token = strtok(buffer, " \t");
+
+               
+            }
+            table->randuri = newRow;
+            
+        }
+
+        lineNumber++;
     }
 
-    if (bytesRead < 0)
-    {
-        perror("Eroare la citirea fișierului");
-        free(table->coloane);
-        free(table);
-        close(fd);
-        return NULL;
-    }
-
-    close(fd);
+    fclose(fd);
     return table;
 }
 
-Table *incarcareTabel(const char *filename)
-{
-    int fd = open(filename, O_RDONLY);
-    if (fd == -1)
-    {
+// Table *incarcareTabel(const char *filename)
+// {
+//     int fd = open(filename, O_RDONLY);
+//     if (fd == -1)
+//     {
+//         perror("Eroare la deschiderea fișierului");
+//         return 1;
+//     }
+
+//     Table *tabel = (Table *)malloc(sizeof(Table));
+//     citesteString(fd, tabel->numeTabel);
+
+//     tabel->numarColoane = citesteInt(fd);
+
+//     tabel->coloane = (Column *)malloc(tabel->numarColoane * sizeof(Column));
+
+//     for (int i = 0; i < tabel->numarColoane; i++)
+//     {
+//         citesteString(fd, tabel->coloane[i].numeColoana);
+//         citesteString(fd, tabel->coloane[i].tipDate);
+//         if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
+//         {
+//             tabel->coloane[i].varchar_length = citesteInt(fd);
+//         }
+//         else
+//         {
+//             tabel->coloane[i].varchar_length = 0;
+//         }
+//     }
+
+//     tabel->numarRanduri = citesteInt(fd);
+//     tabel->randuri = (void **)malloc(tabel->numarRanduri * sizeof(void *));
+
+//     for (int i = 0; i < tabel->numarRanduri; i++)
+//     {
+//         tabel->randuri[i] = malloc(tabel->numarColoane * sizeof(void *));
+//         for (int j = 0; j < tabel->numarColoane; j++)
+//         {
+//             if (strcmp(tabel->coloane[j].tipDate, "VARCHAR") == 0)
+//             {
+//                 char *val = (char *)malloc(tabel->coloane[j].varchar_length * sizeof(char));
+//                 citesteString(fd, val);
+//                 ((char **)tabel->randuri)[i * tabel->numarColoane + j] = val;
+//             }
+//             else
+//             {
+//                 int *val = (int *)malloc(sizeof(int));
+//                 *val = citesteInt(fd);
+//                 ((int **)tabel->randuri)[i * tabel->numarColoane + j] = val;
+//             }
+//         }
+//     }
+
+//     return tabel;
+// }
+
+char** getElemByColumn(Table* tabel, char* numeColoana, int*colIndex){
+    *colIndex = -1;
+    for (int i = 0; i < tabel->numarColoane; i++) {
+        if (strcmp(tabel->coloane[i].numeColoana, numeColoana) == 0) {
+            *colIndex = i;
+            break;
+        }
+    }
+
+    if (*colIndex == -1) {
+        printf("Coloana %s nu a fost găsită.\n", numeColoana);
+        return NULL;
+    }
+
+    char** valori = (char*)malloc(tabel->numarRanduri * sizeof(char));
+    if (valori == NULL) {
+        perror("Eroare la alocarea memoriei");
+        return NULL;
+    }
+
+    for (int i = 0; i < tabel->numarRanduri; i++) {
+        valori[i] = strdup(tabel->randuri[i].elemente[*colIndex]);
+        if (valori[i] == NULL) {
+            perror("Eroare la duplicarea șirului");
+            for (int j = 0; j < i; j++) {
+                free(valori[j]);
+            }
+            free(valori);
+            return NULL;
+        }
+    }
+
+    return valori;
+}
+
+int countLinesInFile(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
         perror("Eroare la deschiderea fișierului");
-        return 1;
+        return -1;
     }
 
-    Table *tabel = (Table *)malloc(sizeof(Table));
-    citesteString(fd, tabel->numeTabel);
+    int lines = 0;
+    char buffer[1024];
 
-    tabel->numarColoane = citesteInt(fd);
-
-    tabel->coloane = (Column *)malloc(tabel->numarColoane * sizeof(Column));
-
-    for (int i = 0; i < tabel->numarColoane; i++)
-    {
-        citesteString(fd, tabel->coloane[i].numeColoana);
-        citesteString(fd, tabel->coloane[i].tipDate);
-        if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
-        {
-            tabel->coloane[i].varchar_length = citesteInt(fd);
-        }
-        else
-        {
-            tabel->coloane[i].varchar_length = 0;
-        }
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        lines++;
     }
 
-    tabel->numarRanduri = citesteInt(fd);
-    tabel->randuri = (void **)malloc(tabel->numarRanduri * sizeof(void *));
-
-    for (int i = 0; i < tabel->numarRanduri; i++)
-    {
-        tabel->randuri[i] = malloc(tabel->numarColoane * sizeof(void *));
-        for (int j = 0; j < tabel->numarColoane; j++)
-        {
-            if (strcmp(tabel->coloane[j].tipDate, "VARCHAR") == 0)
-            {
-                char *val = (char *)malloc(tabel->coloane[j].varchar_length * sizeof(char));
-                citesteString(fd, val);
-                ((char **)tabel->randuri)[i * tabel->numarColoane + j] = val;
-            }
-            else
-            {
-                int *val = (int *)malloc(sizeof(int));
-                *val = citesteInt(fd);
-                ((int **)tabel->randuri)[i * tabel->numarColoane + j] = val;
-            }
-        }
-    }
-
-    return tabel;
+    fclose(file);
+    return lines;
 }

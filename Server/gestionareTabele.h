@@ -20,13 +20,18 @@ typedef struct Column {
     int varchar_length;
 } Column;
 
+typedef struct Row{
+    int index;
+    char** elemente;
+}Row;
+
 typedef struct {
     char numeTabel[MAX_STRING_LENGTH];
     Column* coloane;
     Column* indexColumns[MAX_COLUMNS];
+    Row* randuri;
     int indexCount;
-    int numarColoane ;
-    void** randuri;  
+    int numarColoane;
     int numarRanduri ;
 } Table;
 
@@ -43,6 +48,8 @@ bool checkIfColumnIndexed(Table* table, Column* column);
 int getColumnIndex(Table* table, Column* col) ;
 Column* getColumnByName(Table* table, const char* name);
 Table* incarcareTabel(const char* filename);
+char** getElemByColumn(Table* tabel, char* numeColoana, int* colIndex);
+int countLinesInFile(const char* filename);
 
 
 #endif // GESTIONARE_TABEL_H

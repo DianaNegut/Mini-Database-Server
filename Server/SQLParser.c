@@ -58,13 +58,43 @@ int parse(SQLParser *parser, const char *query)
     }
 }
 
-char **parseSelect(SQLParser *parser, char *stream, char *tableName)
+char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *whereColumn, char *whereValue, char* whereop)
 {
     char **columns = (char **)malloc(MAX_COLUMNS * sizeof(char *));
     if (columns == NULL)
     {
         printf("Eroare la alocarea memoriei pentru coloane.\n");
         return NULL;
+    }
+
+    //operator
+    char* buff = strdup(stream);
+    char* tkn = strtok(buff, " ");
+    while(tkn != NULL && strchr(tkn, '=') == 0 && strchr(tkn, '<') == 0 && strchr(tkn, '>') == 0){
+        tkn = strtok(NULL, " ");
+    }
+
+    if(isalnum(tkn[0])){
+        int i = 1;
+        while(isalnum(tkn[i])){
+            i++;
+        }
+        whereop[0] = tkn[i];
+        if(tkn[i+1] == '='){
+            whereop[1] = tkn[i+1];
+            whereop[2] = '\0';
+        }
+        else
+            whereop[1] = '\0';
+    }
+    else{
+        whereop[0] = tkn[0];
+        if(tkn[1] != ' ' && tkn[1] != '\"'){
+            whereop[1] = tkn[1];
+            whereop[2] = '\0';
+        }
+        else
+            whereop[1] = '\0';
     }
 
     int colCount = 0;
@@ -78,8 +108,8 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName)
             printf("Eroare la alocarea memoriei pentru coloană.\n");
             return NULL;
         }
-        strncpy(columns[colCount], token, MAX_LENGTH - 1);
-        columns[colCount][MAX_LENGTH - 1] = '\0';
+        strncpy(columns[colCount], token, strlen(token));
+        columns[colCount][strlen(token)] = '\0';
 
         int len = strlen(columns[colCount]);
         if (columns[colCount][len - 1] == ',')
@@ -90,17 +120,42 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName)
         colCount++;
         token = strtok(NULL, ", ");
     }
-
+    columns[colCount] = NULL;
     char from[MAX_LENGTH], table[MAX_LENGTH];
     token = strtok(NULL, " ");
-    strncpy(table, token, MAX_LENGTH - 1);
+    strncpy(table, token, strlen(token));
     strcpy(tableName, table);
+
+    token = strtok(NULL, " ");
+    if (token != NULL && strcmp(token, "WHERE") == 0) {
+
+        token = strtok(NULL, " <=>");
+
+        if (token != NULL) {
+            strncpy(whereColumn, token, strlen(token));
+            whereColumn[strlen(token)] = '\0';
+        }
+         
+        token = strtok(NULL, " <=>");
+
+        if (token != NULL) {
+            strncpy(whereValue, token, strlen(token));
+            whereValue[strlen(token)] = '\0';
+        }
+    }
+
     printf("SELECT command: Columns = ");
     for (int i = 0; i < colCount; i++)
     {
         printf("%s ", columns[i]);
     }
     printf(", Table = %s\n", table);
+
+    if (strlen(whereColumn) > 0 && strlen(whereValue) > 0) {
+        printf(", WHERE %s %s \"%s\"", whereColumn, whereop, whereValue);
+    }
+
+    printf("\n-----------------------\n\n");
 
     return columns;
 }

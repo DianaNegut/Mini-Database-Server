@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include "SQLParser.h"
 #include "gestionareTabele.h"
+#include "BST.h"
 #define PORT 8105
 #define BUFFER_SIZE 1024
 
@@ -85,26 +86,58 @@ void handleClient(int clientSocket)
         switch (switching)
         {
         case 0:
-        { 
-            tabel = loadTable("angajati");
-            // char **columns = parser->parseSelect(parser, buffer, titleTabel);
-            // if (columns != NULL)
-            // {
-            //     for (int i = 0; i < 3; i++)
-            //     {
-            //         if (columns[i] != NULL)
-            //         {
-            //             printf("Coloana %d: %s\n", i + 1, columns[i]);
-            //             free(columns[i]); 
-            //         }
-            //     }
-            //     free(columns);
-            // }
-            // else
-            // {
-            //     printf("Eroare la procesarea coloanelor.\n");
-            // }
-            // break;
+        {
+            char *wherecol = (char *)malloc(20);
+            char *whereval = (char *)malloc(20);
+            char *whereop = (char *)malloc(3 * sizeof(char));
+            char **columns = parser->parseSelect(parser, buffer, titleTabel, wherecol, whereval, whereop); // coloanele pe care fac select
+            tabel = loadTable(titleTabel);
+
+            char **elemente = (char *)malloc(tabel->numarRanduri * sizeof(char)); // elementele din coloana din clauza WHERE
+            for (int j = 0; j < tabel->numarRanduri; j++)
+                elemente[j] = (char *)malloc(10);
+            int *colIndex = malloc(sizeof(int)); // indexul coloanei din clauza WHERE
+            elemente = getElemByColumn(tabel, wherecol, colIndex);
+
+            int *rowIndex = malloc(sizeof(int));
+            *rowIndex = 0;
+            BSTNode *root = buildBST(elemente, tabel->numarRanduri, *colIndex, rowIndex);
+
+            printf("Coloana: %d\n", *colIndex);
+            printf("Cuvant: %s pe randul %d\n", root->word, root->row);
+            printf("Cuvant: %s pe randul %d\n", root->right->word, root->right->row);
+            printf("Cuvant: %s pe randul %d\n", root->right->left->word, root->right->left->row);
+            printf("Cuvant: %s pe randul %d\n", root->right->right->word, root->right->right->row);
+            printf("Cuvant: %s pe randul %d\n", root->right->right->right->word, root->right->right->right->row);
+
+            BSTNode **searched = (BSTNode *)malloc(10 * sizeof(BSTNode));
+            int found = 0;
+
+            if (strcmp(whereop, "=") == 0)
+            {
+                searched = findNodesWithValue(root, whereval, &found);
+                for (int i = 0; i < found; i++)
+                {
+                    int row = searched[i]->row;
+                    printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row);
+                }
+            }
+            else if (strcmp(whereop, "<=") == 0)
+            {
+            }
+            else if (strcmp(whereop, ">=") == 0)
+            {
+            }
+            else if (strcmp(whereop, "!=") == 0)
+            {
+            }
+            else
+            {
+                printf("Operator necunoscut in clauza WHERE\n");
+                break;
+            }
+
+            break;
         }
         case 1:
         { // INSERT
@@ -121,7 +154,7 @@ void handleClient(int clientSocket)
         }
         case 4:
         { // CREATE
-            tabel = parseCreateTable(parser,buffer);
+            tabel = parseCreateTable(parser, buffer);
             break;
         }
         default:

@@ -9,7 +9,7 @@
 
 typedef struct SQLParser {
     int (*parse)(struct SQLParser*, const char*);
-    char** (*parseSelect)(struct SQLParser*, char*, char*);
+    char** (*parseSelect)(struct SQLParser*, char*, char*, char*, char*, char*);
     void (*parseInsert)(struct SQLParser*, char*);
     void (*parseUpdate)(struct SQLParser*, char*);
     void (*parseDelete)(struct SQLParser*, char*);
@@ -19,7 +19,7 @@ typedef struct SQLParser {
 
 void initSQLParser(SQLParser* parser);
 int parse(SQLParser* parser, const char* query);
-char** parseSelect(SQLParser* parser, char* stream,char* tableName);
+char** parseSelect(SQLParser* parser, char* stream,char* tableName, char * whereColumn, char* whereValue, char* whereop);
 void parseInsert(SQLParser* parser, char* stream);
 void parseUpdate(SQLParser* parser, char* stream);
 void parseDelete(SQLParser* parser, char* stream);
