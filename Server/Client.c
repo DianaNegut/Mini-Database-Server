@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORT 8087
+#define PORT 8116
 #define BUFFER_SIZE 1024
 
 void trimiteCerereCreareTabel(int socket) {
@@ -26,7 +26,7 @@ void trimiteCerereCreareTabel(int socket) {
     //     strcat(buffer, coloane[i]);
     // }
 
-    snprintf(buffer, sizeof(buffer), "SELECT Nume FROM Clienti WHERE Prenume=\"Daria\"");
+    snprintf(buffer, sizeof(buffer), "INSERT INTO angajati (id, nume, varsta, salariu) VALUES (\"A123\", 1, '30', 5000);");
 
     // Trimiterea cererii către server
     send(socket, buffer, strlen(buffer), 0);

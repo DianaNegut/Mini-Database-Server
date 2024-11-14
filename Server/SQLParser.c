@@ -208,6 +208,7 @@ void append_to_file_values(const char *filename, char values[][MAX_LENGTH], int 
                 return;
             }
         }
+        write(fd, "\t", 1);
     }
     if (write(fd, "\n", 1) == -1)
     {

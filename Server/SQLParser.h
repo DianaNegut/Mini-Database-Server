@@ -1,7 +1,6 @@
 #ifndef SQLPARSER_H
 #define SQLPARSER_H
 
-#define MAX_COLUMNS 20
 #define MAX_VALUES 20
 #define MAX_LENGTH 100
 #include "gestionareTabele.h"
