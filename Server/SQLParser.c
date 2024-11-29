@@ -302,37 +302,85 @@ void parseInsert(SQLParser *parser, char *stream)
     }
 }
 
-void parseUpdate(SQLParser *parser, char *stream)
-{
-    char table[MAX_LENGTH];
-    char set[MAX_LENGTH] = "";
-    char condition[MAX_LENGTH] = "";
-    sscanf(stream, "%s", table);
-    if (!exists_in_master("master", table))
-    {
-        perror("Eroare, tabelul nu exista in baza de date!");
+void parseUpdate(SQLParser *parser, char *stream, char *tableName, char *setcol, char *setval, char *wherecol, char *whereval, char *whereop) {
+    
+    char *token = strtok(stream, " ");
+    
+    if (token == NULL || strcmp(token, "UPDATE") != 0) {
         exit(-1);
     }
-    char *set_start = strstr(stream, "SET");
-    if (set_start != NULL)
-    {
-        set_start += 4;
-        char *where_start = strstr(set_start, "WHERE");
 
-        if (where_start != NULL)
-        {
-            strncpy(set, set_start, where_start - set_start);
-            set[where_start - set_start] = '\0';
-            strncpy(condition, where_start, MAX_LENGTH - 1);
-            condition[MAX_LENGTH - 1] = '\0';
-        }
-        else
-        {
-            strncpy(set, set_start, MAX_LENGTH - 1);
-            set[MAX_LENGTH - 1] = '\0';
+    token = strtok(NULL, " ");
+    if (token == NULL) {
+        exit(-1);
+    }
+    strncpy(tableName, token, strlen(token));
+    tableName[strlen(token)] = '\0';
+
+
+    if (!exists_in_master("master", tableName)) {
+        exit(-1);
+    }
+
+    token = strtok(NULL, " ");
+    if (token == NULL || strcmp(token, "SET") != 0) {
+        exit(-1);
+    }
+
+
+    token = strtok(NULL, "=");
+    if (token == NULL) {
+        exit(-1);
+    }
+    strncpy(setcol, token, strlen(token)-1);
+    setcol[strlen(token)-1] = '\0';
+
+    token = strtok(NULL, " ");
+    if (token == NULL) {
+        exit(-1);
+    }
+    strncpy(setval, token, strlen(token));
+    setval[strlen(token)] = '\0';
+
+    token = strtok(NULL, " ");
+    if (token == NULL || strcmp(token, "WHERE") != 0) {
+        exit(-1);
+    }
+
+    token = strtok(NULL, " ");
+    if (token == NULL) {
+        exit(-1);
+    }
+    strncpy(wherecol, token,strlen(token));
+    wherecol[strlen(token)] = '\0';
+
+    char *operators[] = {"=", "!=", "<", ">", "<=", ">="};
+    int foundOperator = 0;
+    token = strtok(NULL, " ");
+    for (int i = 0; i < 6; i++) {
+        if (strcmp(token, operators[i]) == 0) {
+            strncpy(whereop, operators[i], strlen(token));
+            whereop[strlen(token)] = '\0';
+            foundOperator = 1;
+            break;
         }
     }
-    printf("UPDATE command: Table = %s, Set = %s, Condition = %s\n", table, set, condition);
+    if (!foundOperator) {
+        exit(-1);
+    }
+
+    token = strtok(NULL, " ");
+    if (token == NULL) {
+        exit(-1);
+    }
+    strncpy(whereval, token, strlen(token));
+    whereval[strlen(token)] = '\0';
+
+
+    // printf("UPDATE command parsed:\n");
+    // printf("Table: %s\n", tableName);
+    // printf("SET: %s = %s\n", setcol, setval);
+    // printf("WHERE: %s %s %s\n", wherecol, whereop, whereval);
 }
 
 void append_to_file(const char *filename, const char *text)

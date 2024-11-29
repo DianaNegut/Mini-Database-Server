@@ -1,0 +1,5 @@
+angajati
+4
+id VARCHAR  nume INT    varsta INT  salariu INT
+1	"Ion Popescu"	30	3500
+2	"X Y"	20	3

@@ -23,7 +23,7 @@ BSTNode* insert(BSTNode *root, char *word, int colIndex, int* rowIndex) {
     
     if (strcmp(word, root->word) < 0) {
         root->left = insert(root->left, word, colIndex, rowIndex);
-    } else if (strcmp(word, root->word) > 0) {
+    } else if (strcmp(word, root->word) >= 0) {
         root->right = insert(root->right, word, colIndex, rowIndex);
     }
     
@@ -79,4 +79,73 @@ BSTNode **findNodesWithValue(BSTNode *root, char *target, int *foundCount) {
 
     return results;
 }
+
+void collectNodesExcluding(BSTNode *root, BSTNode ***nodes, int *count, int *size, char *excludeValue) {
+    if (!root) return;
+
+    collectNodesExcluding(root->left, nodes, count, size, excludeValue);
+
+    if (strcmp(root->word, excludeValue) != 0) {
+        if (*count >= *size) {
+            *size *= 2;
+            *nodes = realloc(*nodes, (*size) * sizeof(BSTNode *));
+        }
+        (*nodes)[(*count)++] = root;
+    }
+
+    collectNodesExcluding(root->right, nodes, count, size, excludeValue);
+}
+
+BSTNode **getNodesExcluding(BSTNode *root, char *excludeValue, int *count) {
+    if (!root) return NULL;
+
+    int size = 10;
+    *count = 0;
+    BSTNode **result = (BSTNode **)malloc(size * sizeof(BSTNode *));
+    collectNodesExcluding(root, &result, count, &size, excludeValue);
+    return result;
+}
+
+
+void collectNodesByCondition(BSTNode *root, char *value, char *operator, BSTNode ***result, int *count, int *size) {
+    if (!root) return;
+
+    int comparison = strcmp(root->word, value);
+    int matches = 0;
+
+    if (strcmp(operator, "<") == 0) {
+        matches = (comparison < 0);
+    } else if (strcmp(operator, ">") == 0) {
+        matches = (comparison > 0);
+    } else if (strcmp(operator, "<=") == 0) {
+        matches = (comparison <= 0);
+    } else if (strcmp(operator, ">=") == 0) {
+        matches = (comparison >= 0);
+    }
+
+    if (matches) {
+        if (*count >= *size) {
+            *size *= 2;
+            *result = realloc(*result, (*size) * sizeof(BSTNode *));
+        }
+        (*result)[(*count)++] = root;
+    }
+
+    collectNodesByCondition(root->left, value, operator, result, count, size);
+    collectNodesByCondition(root->right, value, operator, result, count, size);
+}
+
+BSTNode **getNodesByCondition(BSTNode *root, char *value, char *operator, int *count) {
+    int size = 10;
+    *count = 0;
+    BSTNode **result = (BSTNode **)malloc(size * sizeof(BSTNode *));
+    if (!result) {
+        printf("Eroare la alocarea memoriei.\n");
+        return NULL;
+    }
+
+     collectNodesByCondition(root, value, operator, &result, count, &size);
+    return result;
+}
+
 

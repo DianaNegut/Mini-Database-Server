@@ -20,7 +20,7 @@ void initSQLParser(SQLParser* parser);
 int parse(SQLParser* parser, const char* query);
 char** parseSelect(SQLParser* parser, char* stream,char* tableName, char * whereColumn, char* whereValue, char* whereop);
 void parseInsert(SQLParser* parser, char* stream);
-void parseUpdate(SQLParser* parser, char* stream);
+void parseUpdate(SQLParser *parser, char *stream, char *tableName, char *setcol, char *setval, char *wherecol, char *whereval, char *whereop);
 void parseDelete(SQLParser* parser, char* stream);
 Table* parseCreateTable(SQLParser* parser, char* stream);
 

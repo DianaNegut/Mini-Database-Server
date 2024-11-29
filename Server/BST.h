@@ -19,6 +19,9 @@ BSTNode* buildBST(char **elemente, int numarElemente,int colIndex, int* rowindex
 BSTNode **findNodesWithValue(BSTNode *root, char *target, int *foundCount);
 void searchBST(BSTNode *root, char *target, BSTNode ***results, int *resultCount);
 void addResult(BSTNode ***results, int *resultCount, BSTNode *node);
-
+void collectNodesExcluding(BSTNode *root, BSTNode ***nodes, int *count, int *size, char *excludeValue);
+BSTNode **getNodesExcluding(BSTNode *root, char *excludeValue, int *count);
+BSTNode **getNodesByCondition(BSTNode *root, char *value, char *operator, int *count);
+void collectNodesByCondition(BSTNode *root, char *value, char *operator, BSTNode ***result, int *count, int *size);
 
 #endif //BST

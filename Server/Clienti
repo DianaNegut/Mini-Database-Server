@@ -1,0 +1,9 @@
+Clienti
+3
+IDClient INT	Nume VARCHAR(20)	Prenume VARCHAR(20)
+3	"Negut"	"Alexandra"	
+2	"Pascu"	"Daria"	
+1	"Negut"	"Alexandra"	
+5	"Popa"	"Carmen"	
+8	"Andrei"	"Alexandra"	
+4	"Dinu"	"Alexandra"	

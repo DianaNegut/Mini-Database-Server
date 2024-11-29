@@ -4,29 +4,32 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORT 8116
+#define PORT 8112
 #define BUFFER_SIZE 1024
 
 void trimiteCerereCreareTabel(int socket) {
-    // Numele tabelului
-    const char* numeTabel = "utilizatori";
+    const char* numeTabel = "TEST_29.11.2024";
 
-    // Detalii despre coloane
+
     char* coloane[] = {
         "id INT",
-        "nume VARCHAR(50)",
-        "data_nasterii DATE"
+        "nume VARCHAR (20)"
     };
 
-    // Construirea mesajului de cerere
     char buffer[BUFFER_SIZE];
-    //snprintf(buffer, sizeof(buffer), "CREARE_TABEL %s %d", numeTabel, sizeof(coloane) / sizeof(coloane[0]));
-    // for (int i = 0; i < sizeof(coloane) / sizeof(coloane[0]); i++) {
-    //     strcat(buffer, " ");
-    //     strcat(buffer, coloane[i]);
-    // }
+    snprintf(buffer, sizeof(buffer), "CREATE TABLE %s ", numeTabel);
+    for (int i = 0; i < sizeof(coloane) / sizeof(coloane[0]); i++) {
+        strcat(buffer, " ");
+        strcat(buffer, coloane[i]);
+    }
 
-    snprintf(buffer, sizeof(buffer), "INSERT INTO angajati (id, nume, varsta, salariu) VALUES (\"A123\", 1, '30', 5000);");
+    //snprintf(buffer, sizeof(buffer), "INSERT INTO angajati (id, nume, varsta, salariu) VALUES (\"A123\", 1, '30', 5000);");
+
+    //snprintf(buffer, sizeof(buffer), "UPDATE Clienti SET IDClient = 0 WHERE Nume > \"Negut\"");
+    //snprintf(buffer, sizeof(buffer), "UPDATE Clienti SET Prenume = \"Alexandra\" WHERE Nume <= \"Negut\"");
+
+    //snprintf(buffer, sizeof(buffer), "SELECT Prenume, Nume FROM angajati WHERE IDClient < 3");
+    //snprintf(buffer, sizeof(buffer), "SELECT * FROM angajati ");
 
     // Trimiterea cererii către server
     send(socket, buffer, strlen(buffer), 0);

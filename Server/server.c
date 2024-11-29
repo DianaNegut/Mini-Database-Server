@@ -6,7 +6,7 @@
 #include "SQLParser.h"
 #include "gestionareTabele.h"
 #include "BST.h"
-#define PORT 8116
+#define PORT 8112
 #define BUFFER_SIZE 1024
 
 void handleClient(int clientSocket)
@@ -44,7 +44,7 @@ void handleClient(int clientSocket)
         {
             char *copie_buffer = strdup(buffer);
             char *token = strtok(buffer, "*");
-            if (token != NULL)
+            if(strcmp(token, "SELECT ") == 0)//if (token != NULL)
             {
                 // face SELECT * FROM nume tabel
                 char nume_tabel[50];
@@ -68,7 +68,29 @@ void handleClient(int clientSocket)
                 char *whereval = (char *)malloc(20);
                 char *whereop = (char *)malloc(3 * sizeof(char));
                 char **columns = parser->parseSelect(parser, buffer, titleTabel, wherecol, whereval, whereop);
+
                 tabel = loadTable(titleTabel);
+
+                int* colindexes = (int*) malloc(5 * sizeof(int));
+                int nrselectedcols = 0;
+                if(strcmp(columns[0], "*") != 0){
+                    int i = 0;
+                    while(columns[i] != NULL){
+                        Column* col = (Column*) malloc(sizeof(Column));
+                        col = getColumnByName(tabel, (const char*)columns[i]);
+                        colindexes[i] = getColumnIndex(tabel, col);
+                        nrselectedcols++;
+                        i++;
+                    }
+                }
+                else
+                {
+                    nrselectedcols = tabel->numarColoane;
+                    for(int i = 0; i < nrselectedcols; i++){
+                        colindexes[i] = i;
+                        columns[i] = strdup(tabel->coloane[i].numeColoana);
+                    }
+                }
 
                 char **elemente = (char *)malloc(tabel->numarRanduri * sizeof(char));
                 for (int j = 0; j < tabel->numarRanduri; j++)
@@ -79,41 +101,37 @@ void handleClient(int clientSocket)
                 int *rowIndex = malloc(sizeof(int));
                 *rowIndex = 0;
                 BSTNode *root = buildBST(elemente, tabel->numarRanduri, *colIndex, rowIndex);
-                printf("Coloana: %d\n", *colIndex);
-                printf("Cuvant: %s pe randul %d\n", root->word, root->row);
-                printf("Cuvant: %s pe randul %d\n", root->right->word, root->right->row);
-                printf("Cuvant: %s pe randul %d\n", root->right->left->word, root->right->left->row);
-                printf("Cuvant: %s pe randul %d\n", root->right->right->word, root->right->right->row);
-                printf("Cuvant: %s pe randul %d\n", root->right->right->right->word, root->right->right->right->row);
 
                 BSTNode **searched = (BSTNode *)malloc(10 * sizeof(BSTNode));
                 int found = 0;
 
-                if (strcmp(whereop, "=") == 0)
-                {
-                    searched = findNodesWithValue(root, whereval, &found);
-                    for (int i = 0; i < found; i++)
-                    {
-                        int row = searched[i]->row;
-                        printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row);
+                if(strcmp(whereop, "=") == 0){
+                        searched = findNodesWithValue(root, whereval, &found);
+                        for(int i = 0; i < found; i++){
+                            int row = searched[i]->row;
+                            printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row+1);
+                        }
+                }else if(strcmp(whereop, "<=") == 0 || strcmp(whereop, ">=") == 0 || strcmp(whereop, "<") == 0 || strcmp(whereop, ">") == 0){
+                        int n = 0;
+                        searched = getNodesByCondition(root, whereval, whereop, &n);
+                        for(int i = 0; i < n; i++){
+                            int row = searched[i]->row;
+                            printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row+1);
+                        }
+                }else if(strcmp(whereop, "!=") == 0){
+                        int n = 0;
+                        searched = getNodesExcluding(root, whereval, &n);
+                        for(int i = 0; i < n; i++){
+                            int row = searched[i]->row;
+                            printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row+1);
+                        }
+                }
+                    else{
+                        printf("Operator necunoscut in clauza WHERE\n");
+                        break;
                     }
-                }
-                else if (strcmp(whereop, "<=") == 0)
-                {
-                }
-                else if (strcmp(whereop, ">=") == 0)
-                {
-                }
-                else if (strcmp(whereop, "!=") == 0)
-                {
-                }
-                else
-                {
-                    printf("Operator necunoscut in clauza WHERE\n");
-                    break;
-                }
 
-                break;
+                    break;
             }
         }
         case 1:
@@ -123,6 +141,64 @@ void handleClient(int clientSocket)
         }
         case 2:
         { // UPDATE
+            char* wherecol = (char*)malloc(20);
+            char* whereval = (char*)malloc(20);
+            char* whereop = (char*)malloc(20);
+            char* setcol = (char*)malloc(20);
+            char* setval = (char*)malloc(20);
+            parseUpdate(parser, buffer, tableName, setcol, setval, wherecol, whereval, whereop);
+
+            tabel = loadTable(tableName);
+
+                char** elemente = (char**)malloc(tabel->numarRanduri * sizeof(char*)); //elementele din coloana din clauza WHERE
+                    for(int j = 0; j < tabel->numarRanduri; j++)
+                        elemente[j] = (char*)malloc(10);
+                    int* colIndex = malloc(sizeof(int)); //indexul coloanei din clauza WHERE
+                    elemente = getElemByColumn(tabel, wherecol, colIndex);
+
+                    int* rowIndex = malloc(sizeof(int));
+                    *rowIndex = 0;
+                    BSTNode* root = buildBST(elemente, tabel->numarRanduri, *colIndex, rowIndex);
+
+                    BSTNode** searched = (BSTNode**)malloc(10 * sizeof(BSTNode*));
+                    int found = 0;
+
+                    Column* col = malloc(sizeof(Column));
+                    col = getColumnByName(tabel, setcol);
+                    int setColIndex = getColumnIndex(tabel, col);
+
+                    if(strcmp(whereop, "=") == 0){
+                        searched = findNodesWithValue(root, whereval, &found);
+                        printf("%d\n", found);
+                        for(int i = 0; i < found; i++){
+                            int row = searched[i]->row;
+                            printf("Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row+1);
+                            tabel->randuri[row].elemente[setColIndex] = setval;
+                        }
+                        scrieTabelInFisier(tableName, tabel);
+                    }else if(strcmp(whereop, "<=") == 0 || strcmp(whereop, ">=") == 0 || strcmp(whereop, "<") == 0 || strcmp(whereop, ">") == 0){
+                        int n = 0;
+                        searched = getNodesByCondition(root, whereval, whereop, &n);
+                        for(int i = 0; i < n; i++){
+                            int row = searched[i]->row;
+                            printf("Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row+1);
+                            tabel->randuri[row].elemente[setColIndex] = setval;
+                        }
+                        scrieTabelInFisier(tableName, tabel);
+                    }else if(strcmp(whereop, "!=") == 0){
+                        int n = 0;
+                        searched = getNodesExcluding(root, whereval, &n);
+                        for(int i = 0; i < n; i++){
+                            int row = searched[i]->row;
+                            printf("Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row+1);
+                            tabel->randuri[row].elemente[setColIndex] = setval;
+                        }
+                        scrieTabelInFisier(tableName, tabel);
+                    }
+                    else{
+                        printf("Operator necunoscut in clauza WHERE\n");
+                        break;
+                    }
             break;
         }
         case 3:

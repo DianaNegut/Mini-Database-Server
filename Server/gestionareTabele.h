@@ -50,6 +50,7 @@ Column* getColumnByName(Table* table, const char* name);
 Table* incarcareTabel(const char* filename);
 char** getElemByColumn(Table* tabel, char* numeColoana, int* colIndex);
 int countLinesInFile(const char* filename);
+void scrieTabelInFisier(const char *numeFisier, Table *tabel);
 
 
 #endif // GESTIONARE_TABEL_H
