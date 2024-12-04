@@ -5,9 +5,26 @@
 #include <arpa/inet.h>
 #include "SQLParser.h"
 #include "gestionareTabele.h"
+#include "threadPool.h"
 #include "BST.h"
+
+
 #define PORT 8112
 #define BUFFER_SIZE 1024
+#define THREAD_COUNT 4
+#define QUEUE_SIZE 10
+
+typedef struct ClientTask {
+    int clientSocket;
+} ClientTask;
+
+
+void handleClientWrapper(void *arg) {
+    ClientTask *task = (ClientTask *)arg;
+    handleClient(task->clientSocket);
+    free(task);
+}
+
 
 void handleClient(int clientSocket)
 {
@@ -225,41 +242,57 @@ int main()
     socklen_t addr_size;
 
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0)
-    {
+    if (serverSocket < 0) {
         perror("Eroare la crearea socket-ului");
         exit(EXIT_FAILURE);
     }
+
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = htons(PORT);
-    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-    {
+
+    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
         perror("Eroare la legarea socket-ului");
+        close(serverSocket);
         exit(EXIT_FAILURE);
     }
-    if (listen(serverSocket, 10) < 0)
-    {
+
+    if (listen(serverSocket, 10) < 0) {
         perror("Eroare la ascultarea socket-ului");
+        close(serverSocket);
+        exit(EXIT_FAILURE);
+    }
+
+    ThreadPool *pool = createThreadPool(THREAD_COUNT, QUEUE_SIZE);
+    if (!pool) {
+        perror("Eroare la crearea thread pool-ului");
+        close(serverSocket);
         exit(EXIT_FAILURE);
     }
 
     printf("Serverul este in asteptare...\n");
 
-    while (1)
-    {
+    while (1) {
         addr_size = sizeof(clientAddr);
         clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &addr_size);
-        if (clientSocket < 0)
-        {
+        if (clientSocket < 0) {
             perror("Eroare la acceptarea clientului");
             continue;
         }
+
         printf("Client conectat\n");
 
-        handleClient(clientSocket);
+        ClientTask *task = (ClientTask *)malloc(sizeof(ClientTask));
+        task->clientSocket = clientSocket;
+
+        if (addTaskToPool(pool, handleClientWrapper, task) < 0) {
+            printf("Thread pool este plin. Client respins.\n");
+            close(clientSocket);
+            free(task);
+        }
     }
 
+    destroyThreadPool(pool);
     close(serverSocket);
     return 0;
 }

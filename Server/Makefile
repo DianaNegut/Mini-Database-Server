@@ -1,7 +1,7 @@
 
 EXEC = server
 
-SRCS = server.c SQLParser.c gestionareTabele.c BST.c
+SRCS = server.c SQLParser.c gestionareTabele.c BST.c threadPool.c
 
 OBJS = $(SRCS:.c=.o)
 
