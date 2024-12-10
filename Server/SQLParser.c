@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <pthread.h>
 #include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -8,6 +9,10 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "SQLParser.h"
+
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 void initSQLParser(SQLParser *parser)
 {
@@ -47,6 +52,7 @@ int parse(SQLParser *parser, const char *query)
     {
         return 3;
     }
+
     else if (strcmp(command, "CREATE") == 0)
     {
         return 4;
@@ -58,7 +64,7 @@ int parse(SQLParser *parser, const char *query)
     }
 }
 
-char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *whereColumn, char *whereValue, char* whereop)
+char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *whereColumn, char *whereValue, char *whereop)
 {
     char **columns = (char **)malloc(MAX_COLUMNS * sizeof(char *));
     if (columns == NULL)
@@ -67,29 +73,35 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
         return NULL;
     }
 
-    //operator
-    char* buff = strdup(stream);
-    char* tkn = strtok(buff, " ");
-    while(tkn != NULL && strchr(tkn, '=') == 0 && strchr(tkn, '<') == 0 && strchr(tkn, '>') == 0){
+    // operator
+    char *buff = strdup(stream);
+    char *tkn = strtok(buff, " ");
+    while (tkn != NULL && strchr(tkn, '=') == 0 && strchr(tkn, '<') == 0 && strchr(tkn, '>') == 0)
+    {
         tkn = strtok(NULL, " ");
     }
 
-    if(isalnum(tkn[0])){
+    if (isalnum(tkn[0]))
+    {
         int i = 1;
-        while(isalnum(tkn[i])){
+        while (isalnum(tkn[i]))
+        {
             i++;
         }
         whereop[0] = tkn[i];
-        if(tkn[i+1] == '='){
-            whereop[1] = tkn[i+1];
+        if (tkn[i + 1] == '=')
+        {
+            whereop[1] = tkn[i + 1];
             whereop[2] = '\0';
         }
         else
             whereop[1] = '\0';
     }
-    else{
+    else
+    {
         whereop[0] = tkn[0];
-        if(tkn[1] != ' ' && tkn[1] != '\"'){
+        if (tkn[1] != ' ' && tkn[1] != '\"')
+        {
             whereop[1] = tkn[1];
             whereop[2] = '\0';
         }
@@ -127,18 +139,21 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
     strcpy(tableName, table);
 
     token = strtok(NULL, " ");
-    if (token != NULL && strcmp(token, "WHERE") == 0) {
+    if (token != NULL && strcmp(token, "WHERE") == 0)
+    {
 
         token = strtok(NULL, " <=>");
 
-        if (token != NULL) {
+        if (token != NULL)
+        {
             strncpy(whereColumn, token, strlen(token));
             whereColumn[strlen(token)] = '\0';
         }
-         
+
         token = strtok(NULL, " <=>");
 
-        if (token != NULL) {
+        if (token != NULL)
+        {
             strncpy(whereValue, token, strlen(token));
             whereValue[strlen(token)] = '\0';
         }
@@ -151,7 +166,8 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
     }
     printf(", Table = %s\n", table);
 
-    if (strlen(whereColumn) > 0 && strlen(whereValue) > 0) {
+    if (strlen(whereColumn) > 0 && strlen(whereValue) > 0)
+    {
         printf(", WHERE %s %s \"%s\"", whereColumn, whereop, whereValue);
     }
 
@@ -238,8 +254,9 @@ void cleanBuffer(char *buffer)
     *dst = '\0';
 }
 
-void parseInsert(SQLParser *parser, char *stream)
+void parseInsert(SQLParser *parser, char *stream, int socket)
 {
+    Table *tabel;
     char insert[MAX_LENGTH];
     char into[MAX_LENGTH], table[MAX_LENGTH];
     char columns[MAX_COLUMNS][MAX_LENGTH];
@@ -250,11 +267,13 @@ void parseInsert(SQLParser *parser, char *stream)
     cleanBuffer(insert);
     cleanBuffer(into);
     cleanBuffer(table);
-    if (!exists_in_master("master", table))
-    {
-        perror("Eroare, tabelul nu exista in baza de date!");
-        exit(-1);
-    }
+    // if (!exists_in_master("master", table))
+    // {
+    //     perror("Eroare, tabelul nu exista in baza de date!");
+    //     exit(-1);
+    // }
+    pthread_mutex_lock(&mutex);
+    tabel = loadTable(table);
     char *columns_start = strchr(stream, '(');
     char *values_start = strstr(stream, "VALUES");
     if (columns_start && values_start)
@@ -274,16 +293,48 @@ void parseInsert(SQLParser *parser, char *stream)
             values_start++;
             while (*values_start != ')' && *values_start != '\0')
             {
-                sscanf(values_start, "%[^,)]", values[val]);
+                sscanf(values_start, "%[^, )]", values[val]);
+                // verif datele inserate
+                if (strcmp(tabel->coloane[val].tipDate, "INT") == 0)
+                {
+                    for (int i = 0; i < strlen(values[val]); i++)
+                        if (!isdigit(values[val][i]))
+                        {
+                            char buffer_auxiliar[BUFSIZ];
+                            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Valoarea care se incearca a fi inserata INT nu corespunde cu tipul de date al coloanei! %s", tabel->coloane[val].tipDate);
+                            send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
+                            printf("Valoarea care se incearca a fi inserata INT nu corespunde cu tipul de date al coloanei! %s", tabel->coloane[val].tipDate);
+                            exit(-1);
+                        }
+                }
+                else if (strcmp(tabel->coloane[val].tipDate, "VARCHAR") == 0)
+                {
+                    if (strlen(values[val]) > tabel->coloane[val].varchar_length)
+                    {
+                        char buffer_auxiliar[BUFSIZ];
+                        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Valoarea care se incearca a fi inserata are o lungime mai mare decat cea permisa de aceasta coloana!");
+                        send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
+                        printf("Valoarea care se incearca a fi inserata are o lungime mai mare decat cea permisa de aceasta coloana!");
+                        exit(-1);
+                    }
+                }
+                else if (strcmp(tabel->coloane[val].tipDate, "DATE") == 0)
+                {
+                }
                 values_start += strlen(values[val]);
                 if (*values_start == ',')
                     values_start++;
                 val++;
             }
         }
+        char buffer_auxiliar[BUFSIZ];
+        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "INSERT command: Table = %s\nColumns: ", table);
+        send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
         printf("INSERT command: Table = %s\nColumns: ", table);
         for (int i = 0; i < col; i++)
         {
+            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "%s ", columns[i]);
+            send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
             printf("%s ", columns[i]);
         }
 
@@ -292,90 +343,108 @@ void parseInsert(SQLParser *parser, char *stream)
         for (int i = 0; i < val; i++)
         {
             printf("%s ", values[i]);
+            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "%s ", values[i]);
+            send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
         }
         append_to_file_values(table, values, val);
+        send(socket, "\n", strlen("\n"), 0);
         printf("\n");
+        pthread_mutex_unlock(&mutex);
     }
     else
     {
+        char buffer_auxiliar[BUFSIZ];
+        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Invalid INSERT syntax.\n");
+        send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
         printf("Invalid INSERT syntax.\n");
+        pthread_mutex_unlock(&mutex);
     }
 }
 
-void parseUpdate(SQLParser *parser, char *stream, char *tableName, char *setcol, char *setval, char *wherecol, char *whereval, char *whereop) {
-    
+void parseUpdate(SQLParser *parser, char *stream, char *tableName, char *setcol, char *setval, char *wherecol, char *whereval, char *whereop)
+{
+
     char *token = strtok(stream, " ");
-    
-    if (token == NULL || strcmp(token, "UPDATE") != 0) {
+
+    if (token == NULL || strcmp(token, "UPDATE") != 0)
+    {
         exit(-1);
     }
 
     token = strtok(NULL, " ");
-    if (token == NULL) {
+    if (token == NULL)
+    {
         exit(-1);
     }
     strncpy(tableName, token, strlen(token));
     tableName[strlen(token)] = '\0';
 
-
-    if (!exists_in_master("master", tableName)) {
+    if (!exists_in_master("master", tableName))
+    {
         exit(-1);
     }
 
     token = strtok(NULL, " ");
-    if (token == NULL || strcmp(token, "SET") != 0) {
+    if (token == NULL || strcmp(token, "SET") != 0)
+    {
         exit(-1);
     }
-
 
     token = strtok(NULL, "=");
-    if (token == NULL) {
+    if (token == NULL)
+    {
         exit(-1);
     }
-    strncpy(setcol, token, strlen(token)-1);
-    setcol[strlen(token)-1] = '\0';
+    strncpy(setcol, token, strlen(token) - 1);
+    setcol[strlen(token) - 1] = '\0';
 
     token = strtok(NULL, " ");
-    if (token == NULL) {
+    if (token == NULL)
+    {
         exit(-1);
     }
     strncpy(setval, token, strlen(token));
     setval[strlen(token)] = '\0';
 
     token = strtok(NULL, " ");
-    if (token == NULL || strcmp(token, "WHERE") != 0) {
+    if (token == NULL || strcmp(token, "WHERE") != 0)
+    {
         exit(-1);
     }
 
     token = strtok(NULL, " ");
-    if (token == NULL) {
+    if (token == NULL)
+    {
         exit(-1);
     }
-    strncpy(wherecol, token,strlen(token));
+    strncpy(wherecol, token, strlen(token));
     wherecol[strlen(token)] = '\0';
 
     char *operators[] = {"=", "!=", "<", ">", "<=", ">="};
     int foundOperator = 0;
     token = strtok(NULL, " ");
-    for (int i = 0; i < 6; i++) {
-        if (strcmp(token, operators[i]) == 0) {
+    for (int i = 0; i < 6; i++)
+    {
+        if (strcmp(token, operators[i]) == 0)
+        {
             strncpy(whereop, operators[i], strlen(token));
             whereop[strlen(token)] = '\0';
             foundOperator = 1;
             break;
         }
     }
-    if (!foundOperator) {
+    if (!foundOperator)
+    {
         exit(-1);
     }
 
     token = strtok(NULL, " ");
-    if (token == NULL) {
+    if (token == NULL)
+    {
         exit(-1);
     }
     strncpy(whereval, token, strlen(token));
     whereval[strlen(token)] = '\0';
-
 
     // printf("UPDATE command parsed:\n");
     // printf("Table: %s\n", tableName);
@@ -425,7 +494,7 @@ void creareFisier(const char *filename)
     }
 }
 
-Table *parseCreateTable(SQLParser *parser, char *stream)
+Table *parseCreateTable(SQLParser *parser, char *stream, int socket)
 {
     Table *t = (Table *)malloc(sizeof(Table));
     char *token = strtok(stream, " ");
@@ -460,7 +529,6 @@ Table *parseCreateTable(SQLParser *parser, char *stream)
             {
                 int x = atoi(token);
                 c[numarColoane].varchar_length = x;
-
             }
             else
             {
@@ -477,33 +545,100 @@ Table *parseCreateTable(SQLParser *parser, char *stream)
     }
     t->coloane = c;
     t->randuri = 0;
-
+    pthread_mutex_lock(&mutex);
     t->numarColoane = numarColoane;
+    send(socket, numeTabel, strlen(numeTabel), 0);
     printf("Tabel creat: %s\n", numeTabel);
     for (int i = 0; i < numarColoane; i++)
     {
         printf("Coloana %d: %s, Tip: ", i + 1, numeColoane[i]);
-        printf("\t%s", tipuriDate[i]);
+        char buffer_auxiliar[BUFSIZ];
+        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Coloana %d: %s, Tip: \t%s", i + 1, numeColoane[i], tipuriDate[i]);
+        send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
     }
+    pthread_mutex_unlock(&mutex);
     salveazaTabel(t, t->numeTabel);
     return t;
 }
 
-void parseDelete(SQLParser *parser, char *stream)
+void parseDelete(SQLParser *parser, char *stream, char *tableName, char *wherecol, char *whereval, char *whereop, int socket)
 {
-    char from[MAX_LENGTH], table[MAX_LENGTH];
-    char condition[MAX_LENGTH] = "";
-    sscanf(stream, "%s %s", from, table);
-    if (!exists_in_master("master", table))
+    char *token = strtok(stream, " ");
+
+    token = strtok(NULL, " ");
+    if (token == NULL || strcmp(token, "FROM") != 0)
     {
-        perror("Eroare, tabelul nu exista in baza de date!");
         exit(-1);
     }
-    char *condition_start = strstr(stream, "WHERE");
-    if (condition_start != NULL)
+
+    token = strtok(NULL, " ");
+    if (token == NULL)
     {
-        strncpy(condition, condition_start, MAX_LENGTH - 1);
-        condition[MAX_LENGTH - 1] = '\0';
+        exit(-1);
     }
-    printf("DELETE command: Table = %s, Condition = %s\n", table, condition);
+    strncpy(tableName, token, strlen(token));
+    tableName[strlen(token)] = '\0';
+
+    if (!exists_in_master("master", tableName))
+    {
+        exit(-1);
+    }
+
+    token = strtok(NULL, " ");
+    if (token == NULL || strcmp(token, "WHERE") != 0)
+    {
+        exit(-1);
+    }
+
+    token = strtok(NULL, " ");
+    if (token == NULL)
+    {
+        exit(-1);
+    }
+    strncpy(wherecol, token, strlen(token));
+    wherecol[strlen(token)] = '\0';
+
+    char *operators[] = {"=", "!=", "<", ">", "<=", ">="};
+    int foundOperator = 0;
+    token = strtok(NULL, " ");
+    for (int i = 0; i < 6; i++)
+    {
+        if (strcmp(token, operators[i]) == 0)
+        {
+            strncpy(whereop, operators[i], strlen(token));
+            whereop[strlen(token)] = '\0';
+            foundOperator = 1;
+            break;
+        }
+    }
+    if (!foundOperator)
+    {
+        exit(-1);
+    }
+
+    token = strtok(NULL, " ");
+    if (token == NULL)
+    {
+        exit(-1);
+    }
+    strncpy(whereval, token, strlen(token));
+    whereval[strlen(token)] = '\0';
+    pthread_mutex_lock(&mutex);
+    printf("Table: %s\n", tableName);
+    printf("WHERE Column: %s\n", wherecol);
+    printf("WHERE Operator: %s\n", whereop);
+    printf("WHERE Value: %s\n", whereval);
+    pthread_mutex_unlock(&mutex);
+    char buffer[BUFSIZ];
+    snprintf(buffer, sizeof(buffer), "Table: %s\n", tableName);
+    send(socket, buffer, strlen(buffer), 0);
+
+    snprintf(buffer, sizeof(buffer), "WHERE Column: %s\n", wherecol);
+    send(socket, buffer, strlen(buffer), 0);
+
+    snprintf(buffer, sizeof(buffer), "WHERE Operator: %s\n", whereop);
+    send(socket, buffer, strlen(buffer), 0);
+
+    snprintf(buffer, sizeof(buffer), "WHERE Value: %s\n", whereval);
+    send(socket, buffer, strlen(buffer), 0);
 }

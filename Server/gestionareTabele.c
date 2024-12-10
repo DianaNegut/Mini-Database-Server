@@ -1,4 +1,5 @@
 #define _XOPEN_SOURCE 700
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,9 @@
 #define MAX_ROW 2048
 #define BUFFER_SIZE 1024
 #define MAX_NAME_LENGTH 100
+
+pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 bool columnsEqual(Column *col1, Column *col2)
 {
@@ -60,24 +64,35 @@ Column *getColumnByName(Table *table, const char *name)
     return NULL;
 }
 
-void afiseazaTabel(Table *tabel)
+void afiseazaTabel(Table *tabel, int clientSocket)
 {
+    pthread_mutex_lock(&print_mutex);
     printf("-----------------------------------------------------------\n");
+    send(clientSocket, "-----------------------------------------------------------\n", strlen("-----------------------------------------------------------\n"), 0);
+    send(clientSocket, "| ", strlen("| "), 0);
     printf("| ");
     for (int i = 0; i < tabel->numarColoane; i++)
     {
         printf("%s\t|", tabel->coloane[i].numeColoana);
+        send(clientSocket, tabel->coloane[i].numeColoana, strlen(tabel->coloane[i].numeColoana), 0);
+        send(clientSocket, "\t|", strlen("\t|"), 0);
     }
     printf("\n-----------------------------------------------------------\n");
+    send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
+    send(clientSocket,"SUNT AICI", strlen("SUNT AICI"), 0);
     for (int i = 0; i < tabel->numarRanduri; i++)
     {
         printf("| ");
         for (int j = 0; j < tabel->numarColoane; j++)
         {
             printf(" %s\t|", tabel->randuri[i].elemente[j]);
+            send(clientSocket, tabel->randuri[i].elemente[j], strlen(tabel->randuri[i].elemente[j]), 0);
+            send(clientSocket, "\t|", strlen("\t|"), 0);
         }
+        send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
         printf("\n-----------------------------------------------------------\n");
     }
+    pthread_mutex_unlock(&print_mutex);
 }
 
 Table *incarcareTabel(const char *filename);
@@ -93,7 +108,7 @@ int getColumnIndex(Table *table, Column *col)
     return -1;
 }
 
-Table *creazaTabel(const char *numeTabel, Column *coloane, int numarColoane)
+Table *creazaTabel(const char *numeTabel, Column *coloane, int numarColoane, int socketNumber)
 {
     Table *tabel = (Table *)malloc(sizeof(Table));
     strncpy(tabel->numeTabel, numeTabel, MAX_NAME_LENGTH);
@@ -249,7 +264,6 @@ void salveazaTabel(Table *tabel, const char *filename)
         else if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
         {
             tip = "VARCHAR";
-
         }
         else if (strcmp(tabel->coloane[i].tipDate, "DATE") == 0)
             tip = "DATE";
@@ -545,4 +559,34 @@ void scrieTabelInFisier(const char *numeFisier, Table *tabel)
 
     fclose(fisier);
     printf("Tabelul a fost actualizat în fișierul %s.\n", numeFisier);
+}
+
+void stergeRand(Table *tabel, int indexRand)
+{
+    if (indexRand < 0 || indexRand >= tabel->numarRanduri)
+    {
+        printf("Index invalid: %d\n", indexRand);
+        return;
+    }
+
+    for (int i = 0; i < tabel->numarColoane; i++)
+    {
+        free(tabel->randuri[indexRand].elemente[i]);
+    }
+    free(tabel->randuri[indexRand].elemente);
+
+    for (int i = indexRand; i < tabel->numarRanduri - 1; i++)
+    {
+        tabel->randuri[i] = tabel->randuri[i + 1];
+        tabel->randuri[i].index = i;
+    }
+
+    tabel->numarRanduri--;
+
+    tabel->randuri = realloc(tabel->randuri, tabel->numarRanduri * sizeof(Row));
+    if (tabel->randuri == NULL && tabel->numarRanduri > 0)
+    {
+        perror("Eroare la realocarea memoriei pentru randuri");
+        exit(EXIT_FAILURE);
+    }
 }

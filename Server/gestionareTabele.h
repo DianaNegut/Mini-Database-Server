@@ -37,10 +37,10 @@ typedef struct {
 
 
 Table* loadTable(const char *filename);
-Table* creazaTabel(const char* numeTabel, Column* coloane, int numarColoane);
+Table* creazaTabel(const char* numeTabel, Column* coloane, int numarColoane, int socketNumber);
 void salveazaTabel(Table* tabel, const char* filename);
 void insereazaRand(Table* tabel, void** rand);
-void afiseazaTabel(Table* tabel);
+void afiseazaTabel(Table *tabel, int clientSocket);
 bool columnsEqual (Column* col1, Column* col2);
 void addColumn(Table* table, char* name, char* type, int length);
 void addIndexColumn(Table* table, Column* col);
@@ -51,6 +51,7 @@ Table* incarcareTabel(const char* filename);
 char** getElemByColumn(Table* tabel, char* numeColoana, int* colIndex);
 int countLinesInFile(const char* filename);
 void scrieTabelInFisier(const char *numeFisier, Table *tabel);
+void stergeRand(Table *tabel, int indexRand);
 
 
 #endif // GESTIONARE_TABEL_H
