@@ -293,7 +293,18 @@ void parseInsert(SQLParser *parser, char *stream, int socket)
             values_start++;
             while (*values_start != ')' && *values_start != '\0')
             {
+                if (*values_start == '\"') {
+                    values[val][0] = '\"';
+                    values_start++;
+                    sscanf(values_start, "%[^\"]", values[val]+1);
+                    int n = strlen(values[val]);
+                    values[val][n] = '\"';
+                    values[val][n+1] = '\0';
+                } 
+                else {
+                // Citim valoarea fără ghilimele
                 sscanf(values_start, "%[^, )]", values[val]);
+                }
                 // verif datele inserate
                 if (strcmp(tabel->coloane[val].tipDate, "INT") == 0)
                 {
@@ -323,6 +334,8 @@ void parseInsert(SQLParser *parser, char *stream, int socket)
                 }
                 values_start += strlen(values[val]);
                 if (*values_start == ',')
+                    values_start++;
+                if(*values_start == ' ')
                     values_start++;
                 val++;
             }

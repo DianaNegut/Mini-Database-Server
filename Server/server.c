@@ -1,9 +1,12 @@
+
+#define _XOPEN_SOURCE 700
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include "SQLParser.h"
+#include <pthread.h>
 #include "gestionareTabele.h"
 #include "threadPool.h"
 #include "BST.h"
@@ -12,6 +15,8 @@
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
+
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 typedef struct ClientTask
 {
@@ -66,7 +71,7 @@ void handleClient(int clientSocket)
         {
         case 0:
         { // SELECT
-
+            pthread_rwlock_rdlock(&rwlock);
             char *copie_buffer = strdup(buffer);
             char *token = strtok(buffer, "*");
             if (strcmp(token, "SELECT ") == 0) // if (token != NULL)
@@ -171,17 +176,20 @@ void handleClient(int clientSocket)
                     printf("Operator necunoscut in clauza WHERE\n");
                     break;
                 }
-
+                pthread_rwlock_unlock(&rwlock);
                 break;
             }
         }
         case 1:
         { // INSERT
+            pthread_rwlock_wrlock(&rwlock);
             parseInsert(parser, buffer, clientSocket);
+            pthread_rwlock_unlock(&rwlock);
             break;
         }
         case 2:
         { // UPDATE
+            pthread_rwlock_wrlock(&rwlock);
             char *wherecol = (char *)malloc(20);
             char *whereval = (char *)malloc(20);
             char *whereop = (char *)malloc(20);
@@ -260,12 +268,15 @@ void handleClient(int clientSocket)
                 snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Operator necunoscut in clauza WHERE\n");
                 send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
                 printf("Operator necunoscut in clauza WHERE\n");
+                pthread_rwlock_wrlock(&rwlock);
                 break;
             }
+            pthread_rwlock_wrlock(&rwlock);
             break;
         }
         case 3:
         { // DELETE
+            pthread_rwlock_wrlock(&rwlock);
             char *wherecol = (char *)malloc(20);
             char *whereval = (char *)malloc(20);
             char *whereop = (char *)malloc(20);
@@ -334,13 +345,17 @@ void handleClient(int clientSocket)
                 snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Operator necunoscut in clauza WHERE\n");
                 send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
                 printf("Operator necunoscut in clauza WHERE\n");
+                pthread_rwlock_unlock(&rwlock);
                 break;
             }
+            pthread_rwlock_unlock(&rwlock);
             break;
         }
         case 4:
         { // CREATE
+            pthread_rwlock_wrlock(&rwlock);
             tabel = parseCreateTable(parser, buffer, clientSocket);
+            pthread_rwlock_unlock(&rwlock);
             break;
         }
         default:
@@ -420,6 +435,7 @@ int main()
     }
 
     destroyThreadPool(pool);
+    pthread_rwlock_destroy(&rwlock);
     close(serverSocket);
     return 0;
 }
