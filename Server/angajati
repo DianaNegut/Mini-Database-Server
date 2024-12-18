@@ -3,4 +3,4 @@ angajati
 id INT  nume VARCHAR(10)   varsta INT   salariu INT
 1	"Ion Popescu"	30	3500
 2	"X Y"	20	3
-7 	"ANA m" 	30 	5000	
+3 	"ANA m" 	30 	5000	

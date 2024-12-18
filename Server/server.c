@@ -8,14 +8,17 @@
 #include "SQLParser.h"
 #include <pthread.h>
 #include "gestionareTabele.h"
+#include "cache.h"
 #include "threadPool.h"
 
-#define PORT 8125
+#define PORT 8126
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
 
 pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_mutex_t display_mutex = PTHREAD_MUTEX_INITIALIZER;
+Cache *cache;
 
 typedef struct ClientTask
 {
@@ -44,6 +47,7 @@ void handleClient(int clientSocket)
     char titleTabel[30];
     while (1)
     {
+        memset(buffer, 0, sizeof(buffer));
         bytesRead = read(clientSocket, buffer, sizeof(buffer) - 1);
 
         buffer[bytesRead] = '\0';
@@ -71,123 +75,159 @@ void handleClient(int clientSocket)
         case 0:
         { // SELECT
             pthread_rwlock_rdlock(&rwlock);
-            char *copie_buffer = strdup(buffer);
-            char *token = strtok(buffer, "*");
-            if (strcmp(token, "SELECT ") == 0) // if (token != NULL)
+            CacheEntry *entry = findInCache(cache, buffer);
+            if (entry)
             {
-                // face SELECT * FROM nume tabel
-                char nume_tabel[50];
-                char *from_ptr;
-                from_ptr = strstr(copie_buffer, "FROM");
-                if (from_ptr != NULL)
-                {
-                    sscanf(from_ptr + 5, "%s", nume_tabel);
-                    char buffer_auxiliar[BUFFER_SIZE];
-                    snprintf(buffer_auxiliar, strlen(buffer_auxiliar), "Numele tabelului este: %s\n", nume_tabel);
-                    send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-                    printf("Numele tabelului este: %s\n", nume_tabel);
-                    tabel = loadTable(nume_tabel);
-                    afiseazaTabel(tabel, clientSocket);
-                }
-                else
-                {
-                    send(clientSocket, "Nu s-a găsit un tabel în interogare.\n", strlen("Nu s-a găsit un tabel în interogare.\n"), 0);
-                    printf("Nu s-a găsit un tabel în interogare.\n");
-                }
+                pthread_mutex_lock(&display_mutex);
+                send(clientSocket, entry->result, strlen(entry->result), 0);
+                pthread_mutex_unlock(&display_mutex);
+                printf("Rezultatul SELECT a fost preluat din cache.\n");
             }
             else
             {
-                char *wherecol = (char *)malloc(20);
-                char *whereval = (char *)malloc(20);
-                char *whereop = (char *)malloc(3 * sizeof(char));
-                char **columns = parser->parseSelect(parser, buffer, titleTabel, wherecol, whereval, whereop);
-
-                tabel = loadTable(titleTabel);
-
-                int *colindexes = (int *)malloc(5 * sizeof(int));
-                int nrselectedcols = 0;
-                if (strcmp(columns[0], "*") != 0)
+                char *copie_buffer = strdup(buffer);
+                char *token = strtok(buffer, "*");
+                if (strcmp(token, "SELECT ") == 0)
                 {
-                    int i = 0;
-                    while (columns[i] != NULL)
+                    // face SELECT * FROM nume tabel
+                    char nume_tabel[50];
+                    char *from_ptr;
+                    from_ptr = strstr(copie_buffer, "FROM");
+                    if (from_ptr != NULL)
                     {
-                        Column *col = (Column *)malloc(sizeof(Column));
-                        col = getColumnByName(tabel, (const char *)columns[i]);
-                        colindexes[i] = getColumnIndex(tabel, col);
-                        nrselectedcols++;
-                        i++;
+                        sscanf(from_ptr + 5, "%s", nume_tabel);
+                        char buffer_auxiliar[BUFFER_SIZE];
+                        pthread_mutex_lock(&display_mutex);
+                        snprintf(buffer_auxiliar, strlen(buffer_auxiliar), "Numele tabelului este: %s\n", nume_tabel);
+                        send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
+                        printf("Numele tabelului este: %s\n", nume_tabel);
+                        pthread_mutex_unlock(&display_mutex);
+                        tabel = loadTable(nume_tabel);
+                        pthread_mutex_lock(&display_mutex);
+                        afiseazaTabel(tabel, clientSocket);
+                        pthread_mutex_unlock(&display_mutex);
+                    }
+                    else
+                    {
+                        pthread_mutex_lock(&display_mutex);
+                        send(clientSocket, "Nu s-a găsit un tabel în interogare.\n", strlen("Nu s-a găsit un tabel în interogare.\n"), 0);
+                        printf("Nu s-a găsit un tabel în interogare.\n");
+                        pthread_mutex_unlock(&display_mutex);
                     }
                 }
                 else
                 {
-                    nrselectedcols = tabel->numarColoane;
-                    for (int i = 0; i < nrselectedcols; i++)
+                    char *wherecol = (char *)malloc(20);
+                    char *whereval = (char *)malloc(20);
+                    char *whereop = (char *)malloc(3 * sizeof(char));
+                    char **columns = parser->parseSelect(parser, buffer, titleTabel, wherecol, whereval, whereop);
+
+                    tabel = loadTable(titleTabel);
+
+                    int *colindexes = (int *)malloc(5 * sizeof(int));
+                    int nrselectedcols = 0;
+                    if (strcmp(columns[0], "*") != 0)
                     {
-                        colindexes[i] = i;
-                        columns[i] = strdup(tabel->coloane[i].numeColoana);
+                        int i = 0;
+                        while (columns[i] != NULL)
+                        {
+                            Column *col = (Column *)malloc(sizeof(Column));
+                            col = getColumnByName(tabel, (const char *)columns[i]);
+                            colindexes[i] = getColumnIndex(tabel, col);
+                            nrselectedcols++;
+                            i++;
+                        }
                     }
-                }
+                    else
+                    {
+                        nrselectedcols = tabel->numarColoane;
+                        for (int i = 0; i < nrselectedcols; i++)
+                        {
+                            colindexes[i] = i;
+                            columns[i] = strdup(tabel->coloane[i].numeColoana);
+                        }
+                    }
 
-                char **elemente = (char *)malloc(tabel->numarRanduri * sizeof(char));
-                for (int j = 0; j < tabel->numarRanduri; j++)
-                    elemente[j] = (char *)malloc(10);
-                int *colIndex = malloc(sizeof(int));
-                elemente = getElemByColumn(tabel, wherecol, colIndex);
+                    char **elemente = (char *)malloc(tabel->numarRanduri * sizeof(char));
+                    for (int j = 0; j < tabel->numarRanduri; j++)
+                        elemente[j] = (char *)malloc(10);
+                    int *colIndex = malloc(sizeof(int));
+                    elemente = getElemByColumn(tabel, wherecol, colIndex);
 
-                int *rowIndex = malloc(sizeof(int));
-                *rowIndex = 0;
-                BSTNode *root = buildBST(elemente, tabel->numarRanduri, *colIndex, rowIndex);
+                    int *rowIndex = malloc(sizeof(int));
+                    *rowIndex = 0;
+                    BSTNode *root = buildBST(elemente, tabel->numarRanduri, *colIndex, rowIndex);
 
-                BSTNode **searched = (BSTNode *)malloc(10 * sizeof(BSTNode));
-                int found = 0;
+                    BSTNode **searched = (BSTNode *)malloc(10 * sizeof(BSTNode));
+                    int found = 0;
 
-                char buffer[1024];
+                    char buffer[1024];
 
-                if (strcmp(whereop, "=") == 0)
-                {
-                    searched = findNodesWithValue(root, whereval, &found);
-                    // for(int j = 0; j < nrselectedcols; j++)
-                    //     for (int i = 0; i < found; i++)
-                    //     {
-                    //         int row = searched[i]->row;
-                    //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    //         send(clientSocket, buffer, strlen(buffer), 0);
-                    //     }
-                    afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, found);
-                }
-                else if (strcmp(whereop, "<=") == 0 || strcmp(whereop, ">=") == 0 || strcmp(whereop, "<") == 0 || strcmp(whereop, ">") == 0)
-                {
-                    int n = 0;
-                    searched = getNodesByCondition(root, whereval, whereop, &n);
-                    // for(int j = 0; j < nrselectedcols; j++)
-                    //     for (int i = 0; i < n; i++)
-                    //     {
-                    //         int row = searched[i]->row;
-                    //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[j], row + 1);
-                    //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[j], row + 1);
-                    //         send(clientSocket, buffer, strlen(buffer), 0);
-                    //     }
-                    afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, n);
-                }
-                else if (strcmp(whereop, "!=") == 0)
-                {
-                    int n = 0;
-                    searched = getNodesExcluding(root, whereval, &n);
-                    // for(int j = 0; j < nrselectedcols; j++)
-                    // for (int i = 0; i < n; i++)
-                    //     {
-                    //         int row = searched[i]->row;
-                    //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    //         send(clientSocket, buffer, strlen(buffer), 0);
-                    //     }
-                    afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, n);
-                }
-                else
-                {
-                    printf("Operator necunoscut in clauza WHERE\n");
-                    break;
+                    if (strcmp(whereop, "=") == 0)
+                    {
+                        searched = findNodesWithValue(root, whereval, &found);
+                        // for(int j = 0; j < nrselectedcols; j++)
+                        //     for (int i = 0; i < found; i++)
+                        //     {
+                        //         int row = searched[i]->row;
+                        //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                        //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                        //         send(clientSocket, buffer, strlen(buffer), 0);
+                        //     }
+                        pthread_mutex_lock(&display_mutex);
+                        afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, found);
+                        pthread_mutex_unlock(&display_mutex);
+                    }
+                    else if (strcmp(whereop, "<=") == 0 || strcmp(whereop, ">=") == 0 || strcmp(whereop, "<") == 0 || strcmp(whereop, ">") == 0)
+                    {
+                        int n = 0;
+                        searched = getNodesByCondition(root, whereval, whereop, &n);
+                        // for(int j = 0; j < nrselectedcols; j++)
+                        //     for (int i = 0; i < n; i++)
+                        //     {
+                        //         int row = searched[i]->row;
+                        //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[j], row + 1);
+                        //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[j], row + 1);
+                        //         send(clientSocket, buffer, strlen(buffer), 0);
+                        //     }
+                        pthread_mutex_lock(&display_mutex);
+                        afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, n);
+                        pthread_mutex_unlock(&display_mutex);
+                    }
+                    else if (strcmp(whereop, "!=") == 0)
+                    {
+                        int n = 0;
+                        searched = getNodesExcluding(root, whereval, &n);
+                        // for(int j = 0; j < nrselectedcols; j++)
+                        // for (int i = 0; i < n; i++)
+                        //     {
+                        //         int row = searched[i]->row;
+                        //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                        //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                        //         send(clientSocket, buffer, strlen(buffer), 0);
+                        //     }
+
+                        pthread_mutex_lock(&display_mutex);
+                        afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, n);
+                        pthread_mutex_unlock(&display_mutex);
+                    }
+                    else
+                    {
+                        pthread_mutex_lock(&display_mutex);
+                        printf("Operator necunoscut in clauza WHERE\n");
+                        send(clientSocket, "Operator necunoscut în clauza WHERE\n", strlen("Operator necunoscut în clauza WHERE\n"), 0);
+                        pthread_mutex_unlock(&display_mutex);
+                        break;
+                    }
+                    free(wherecol);
+                    free(whereval);
+                    free(whereop);
+                    free(columns);
+                    free(colindexes);
+                    free(elemente);
+                    free(colIndex);
+                    free(rowIndex);
+                    free(searched);
                 }
                 pthread_rwlock_unlock(&rwlock);
                 break;
@@ -379,6 +419,7 @@ void handleClient(int clientSocket)
             break;
         }
     }
+    free(parser);
     printf("Se inchide conexiunea!\n");
     close(clientSocket);
 }
@@ -388,6 +429,7 @@ int main()
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t addr_size;
+    cache = createCache();
 
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket < 0)
