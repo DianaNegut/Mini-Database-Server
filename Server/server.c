@@ -9,9 +9,8 @@
 #include <pthread.h>
 #include "gestionareTabele.h"
 #include "threadPool.h"
-#include "BST.h"
 
-#define PORT 8120
+#define PORT 8125
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
@@ -142,34 +141,48 @@ void handleClient(int clientSocket)
                 BSTNode **searched = (BSTNode *)malloc(10 * sizeof(BSTNode));
                 int found = 0;
 
+                char buffer[1024];
+
                 if (strcmp(whereop, "=") == 0)
                 {
                     searched = findNodesWithValue(root, whereval, &found);
-                    for (int i = 0; i < found; i++)
-                    {
-                        int row = searched[i]->row;
-                        printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    }
+                    // for(int j = 0; j < nrselectedcols; j++)
+                    //     for (int i = 0; i < found; i++)
+                    //     {
+                    //         int row = searched[i]->row;
+                    //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                    //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                    //         send(clientSocket, buffer, strlen(buffer), 0);
+                    //     }
+                    afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, found);
                 }
                 else if (strcmp(whereop, "<=") == 0 || strcmp(whereop, ">=") == 0 || strcmp(whereop, "<") == 0 || strcmp(whereop, ">") == 0)
                 {
                     int n = 0;
                     searched = getNodesByCondition(root, whereval, whereop, &n);
-                    for (int i = 0; i < n; i++)
-                    {
-                        int row = searched[i]->row;
-                        printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    }
+                    // for(int j = 0; j < nrselectedcols; j++)
+                    //     for (int i = 0; i < n; i++)
+                    //     {
+                    //         int row = searched[i]->row;
+                    //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[j], row + 1);
+                    //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[j], row + 1);
+                    //         send(clientSocket, buffer, strlen(buffer), 0);
+                    //     }
+                    afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, n);
                 }
                 else if (strcmp(whereop, "!=") == 0)
                 {
                     int n = 0;
                     searched = getNodesExcluding(root, whereval, &n);
-                    for (int i = 0; i < n; i++)
-                    {
-                        int row = searched[i]->row;
-                        printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
-                    }
+                    // for(int j = 0; j < nrselectedcols; j++)
+                    // for (int i = 0; i < n; i++)
+                    //     {
+                    //         int row = searched[i]->row;
+                    //         printf("Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                    //         snprintf(buffer, 1024, "Din coloana %s am gasit elementul %s pe randul %d\n", columns[0], tabel->randuri[row].elemente[1], row + 1);
+                    //         send(clientSocket, buffer, strlen(buffer), 0);
+                    //     }
+                    afisare_nice(clientSocket, tabel, columns, nrselectedcols, colindexes, searched, n);
                 }
                 else
                 {

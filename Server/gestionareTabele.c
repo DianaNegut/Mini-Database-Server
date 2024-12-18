@@ -66,7 +66,7 @@ Column *getColumnByName(Table *table, const char *name)
 
 void afiseazaTabel(Table *tabel, int clientSocket)
 {
-    pthread_mutex_lock(&print_mutex);
+    //pthread_mutex_lock(&print_mutex);
     printf("-----------------------------------------------------------\n");
     send(clientSocket, "-----------------------------------------------------------\n", strlen("-----------------------------------------------------------\n"), 0);
     send(clientSocket, "| ", strlen("| "), 0);
@@ -79,12 +79,14 @@ void afiseazaTabel(Table *tabel, int clientSocket)
     }
     printf("\n-----------------------------------------------------------\n");
     send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
-    send(clientSocket,"SUNT AICI", strlen("SUNT AICI"), 0);
+    //pthread_mutex_unlock(&print_mutex);
+    //send(clientSocket,"SUNT AICI", strlen("SUNT AICI"), 0);
     for (int i = 0; i < tabel->numarRanduri; i++)
     {
         printf("| ");
         for (int j = 0; j < tabel->numarColoane; j++)
         {
+            //pthread_mutex_lock(&print_mutex);
             printf(" %s\t|", tabel->randuri[i].elemente[j]);
             send(clientSocket, tabel->randuri[i].elemente[j], strlen(tabel->randuri[i].elemente[j]), 0);
             send(clientSocket, "\t|", strlen("\t|"), 0);
@@ -92,7 +94,35 @@ void afiseazaTabel(Table *tabel, int clientSocket)
         send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
         printf("\n-----------------------------------------------------------\n");
     }
-    pthread_mutex_unlock(&print_mutex);
+    //pthread_mutex_unlock(&print_mutex);
+}
+
+void afisare_nice(int clientSocket, Table* tabel, char** coloane, int nrcols, int* colindexes, BSTNode** searched, int nrfound){
+    printf("-----------------------------------------------------------\n");
+    send(clientSocket, "-----------------------------------------------------------\n", strlen("-----------------------------------------------------------\n"), 0);
+    send(clientSocket, "| ", strlen("| "), 0);
+    printf("| ");
+    for(int i = 0; i < nrcols; i++){
+        printf("%s\t|", coloane[i]);
+        send(clientSocket, "%s\t|", coloane[i], strlen(coloane[i]), 0);
+    }
+
+    printf("\n-----------------------------------------------------------\n");
+    send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
+    send(clientSocket, "| ", strlen("| "), 0);
+    printf("| ");
+    for(int i = 0; i < nrfound; i++){
+        for(int j = 0; j < nrcols; j++){
+            int row = searched[i]->row;
+            printf("%s\t|", tabel->randuri[row].elemente[colindexes[j]]);
+            send(clientSocket, "%s\t|", tabel->randuri[row].elemente[colindexes[j]], strlen(tabel->randuri[row].elemente[colindexes[j]]), 0);
+        }
+        printf("\n-----------------------------------------------------------\n");
+        send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
+        send(clientSocket, "| ", strlen("| "), 0);
+        if(nrfound - i > 1)
+            printf("| ");
+    }
 }
 
 Table *incarcareTabel(const char *filename);
@@ -425,7 +455,7 @@ Table *loadTable(const char *filename)
                     if (token)
                     {
                         newRow[i].elemente[j] = strdup(token);
-                        token = strtok(NULL, " \t");
+                        token = strtok(NULL, "\t");
                     }
                     else
                     {

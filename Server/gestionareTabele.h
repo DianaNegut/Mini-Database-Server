@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "BST.h"
+
 
 #define MAX_COLUMNS 100
 #define MAX_STRING_LENGTH 100
@@ -52,6 +54,7 @@ char** getElemByColumn(Table* tabel, char* numeColoana, int* colIndex);
 int countLinesInFile(const char* filename);
 void scrieTabelInFisier(const char *numeFisier, Table *tabel);
 void stergeRand(Table *tabel, int indexRand);
+void afisare_nice(int clientSocket, Table* tabel, char** coloane, int nrcols, int* colindexes, BSTNode** searched, int nrfound);
 
 
 #endif // GESTIONARE_TABEL_H
