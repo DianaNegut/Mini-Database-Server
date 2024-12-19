@@ -73,7 +73,12 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
         return NULL;
     }
 
-    // operator
+    // Inițializează variabilele where pentru situațiile fără clauză WHERE
+    whereColumn[0] = '\0';
+    whereValue[0] = '\0';
+    whereop[0] = '\0';
+
+    // Operator
     char *buff = strdup(stream);
     char *tkn = strtok(buff, " ");
     while (tkn != NULL && strchr(tkn, '=') == 0 && strchr(tkn, '<') == 0 && strchr(tkn, '>') == 0)
@@ -81,7 +86,7 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
         tkn = strtok(NULL, " ");
     }
 
-    if (isalnum(tkn[0]))
+    if (tkn != NULL && isalnum(tkn[0]))
     {
         int i = 1;
         while (isalnum(tkn[i]))
@@ -97,7 +102,7 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
         else
             whereop[1] = '\0';
     }
-    else
+    else if (tkn != NULL)
     {
         whereop[0] = tkn[0];
         if (tkn[1] != ' ' && tkn[1] != '\"')
@@ -133,17 +138,22 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
         token = strtok(NULL, ", ");
     }
     columns[colCount] = NULL;
-    char from[MAX_LENGTH], table[MAX_LENGTH];
+
     token = strtok(NULL, " ");
-    strncpy(table, token, strlen(token));
-    strcpy(tableName, table);
+    if (token == NULL)
+    {
+        printf("Eroare: nu s-a găsit numele tabelului după clauza FROM.\n");
+        free(buff);
+        return NULL;
+    }
+
+    strncpy(tableName, token, strlen(token));
+    tableName[strlen(token)] = '\0';
 
     token = strtok(NULL, " ");
     if (token != NULL && strcmp(token, "WHERE") == 0)
     {
-
         token = strtok(NULL, " <=>");
-
         if (token != NULL)
         {
             strncpy(whereColumn, token, strlen(token));
@@ -151,7 +161,6 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
         }
 
         token = strtok(NULL, " <=>");
-
         if (token != NULL)
         {
             strncpy(whereValue, token, strlen(token));
@@ -164,7 +173,7 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
     {
         printf("%s ", columns[i]);
     }
-    printf(", Table = %s\n", table);
+    printf(", Table = %s\n", tableName);
 
     if (strlen(whereColumn) > 0 && strlen(whereValue) > 0)
     {
@@ -173,6 +182,7 @@ char **parseSelect(SQLParser *parser, char *stream, char *tableName, char *where
 
     printf("\n-----------------------\n\n");
 
+    free(buff);
     return columns;
 }
 

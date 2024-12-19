@@ -1,12 +1,12 @@
 #ifndef CACHE_H
 #define CACHE_H
 
-#define CACHE_CAPACITY 10 
+#define CACHE_CAPACITY 10  
 
 
 typedef struct CacheEntry {
     char *query;           
-    char *result;         
+    char **result;         
     struct CacheEntry *prev; 
     struct CacheEntry *next; 
 } CacheEntry;
@@ -14,13 +14,14 @@ typedef struct CacheEntry {
 
 typedef struct Cache {
     CacheEntry *head;      
-    CacheEntry *tail;      
-    int size;              
+    CacheEntry *tail;     
+    int size;             
 } Cache;
 
 
+
 Cache *createCache();
-void addToCache(Cache *cache, const char *query, const char *result);
+void addToCache(Cache *cache, const char *query, char **result);
 CacheEntry *findInCache(Cache *cache, const char *query);
 void clearCache(Cache *cache);
 

@@ -25,13 +25,11 @@ CacheEntry *findInCache(Cache *cache, const char *query) {
     return NULL; 
 }
 
-
-void addToCache(Cache *cache, const char *query, const char *result) {
+void addToCache(Cache *cache, const char *query, char **result) {
     CacheEntry *existing = findInCache(cache, query);
 
 
     if (existing) {
-
         if (existing->prev) existing->prev->next = existing->next;
         if (existing->next) existing->next->prev = existing->prev;
 
@@ -48,19 +46,26 @@ void addToCache(Cache *cache, const char *query, const char *result) {
 
     CacheEntry *newEntry = (CacheEntry *)malloc(sizeof(CacheEntry));
     newEntry->query = strdup(query);
-    newEntry->result = strdup(result);
+
+
+    int count = 0;
+    while (result[count]) count++;
+
+    newEntry->result = (char **)malloc((count + 1) * sizeof(char *));
+    for (int i = 0; i < count; i++) {
+        newEntry->result[i] = strdup(result[i]);
+    }
+    newEntry->result[count] = NULL; 
+
     newEntry->prev = NULL;
     newEntry->next = cache->head;
-
 
     if (cache->head) cache->head->prev = newEntry;
     cache->head = newEntry;
 
-
     if (!cache->tail) cache->tail = newEntry;
 
     cache->size++;
-
 
     if (cache->size > CACHE_CAPACITY) {
         CacheEntry *toRemove = cache->tail;
@@ -69,8 +74,13 @@ void addToCache(Cache *cache, const char *query, const char *result) {
         cache->tail = toRemove->prev;
 
         free(toRemove->query);
+
+        for (int i = 0; toRemove->result[i] != NULL; i++) {
+            free(toRemove->result[i]);
+        }
         free(toRemove->result);
         free(toRemove);
+
         cache->size--;
     }
 }
@@ -84,6 +94,10 @@ void clearCache(Cache *cache) {
         current = current->next;
 
         free(toDelete->query);
+
+        for (int i = 0; toDelete->result[i] != NULL; i++) {
+            free(toDelete->result[i]);
+        }
         free(toDelete->result);
         free(toDelete);
     }
