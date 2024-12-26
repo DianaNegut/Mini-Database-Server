@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-Cache *createCache() {
+Cache *createCache()
+{
     Cache *cache = (Cache *)malloc(sizeof(Cache));
     cache->head = NULL;
     cache->tail = NULL;
@@ -12,72 +12,75 @@ Cache *createCache() {
     return cache;
 }
 
-
-CacheEntry *findInCache(Cache *cache, const char *query) {
+CacheEntry *findInCache(Cache *cache, const char *query)
+{
     CacheEntry *current = cache->head;
 
-    while (current) {
-        if (strcmp(current->query, query) == 0) {
-            return current; 
+    while (current)
+    {
+        if (strcmp(current->query, query) == 0)
+        {
+            printf("------------------------------------------------------------------------------\n");
+            printf("Intrare in cache gasita!\n");
+            return current;
         }
         current = current->next;
     }
-    return NULL; 
+    printf("------------------------------------------------------------------------------\n");
+    printf("INTARARE LIPSA IN CACHE!\n");
+    return NULL;
 }
 
-void addToCache(Cache *cache, const char *query, char **result) {
+void addToCache(Cache *cache, const char *query, const char *result)
+{
     CacheEntry *existing = findInCache(cache, query);
 
+    // Dacă intrarea există deja, mut-o la început (LRU)
+    if (existing)
+    {
+        if (existing->prev)
+            existing->prev->next = existing->next;
+        if (existing->next)
+            existing->next->prev = existing->prev;
 
-    if (existing) {
-        if (existing->prev) existing->prev->next = existing->next;
-        if (existing->next) existing->next->prev = existing->prev;
-
-        if (cache->tail == existing) cache->tail = existing->prev;
+        if (cache->tail == existing)
+            cache->tail = existing->prev;
 
         existing->prev = NULL;
         existing->next = cache->head;
-        if (cache->head) cache->head->prev = existing;
+        if (cache->head)
+            cache->head->prev = existing;
         cache->head = existing;
 
         return;
     }
 
-
+    // Creează o nouă intrare
     CacheEntry *newEntry = (CacheEntry *)malloc(sizeof(CacheEntry));
-    newEntry->query = strdup(query);
-
-
-    int count = 0;
-    while (result[count]) count++;
-
-    newEntry->result = (char **)malloc((count + 1) * sizeof(char *));
-    for (int i = 0; i < count; i++) {
-        newEntry->result[i] = strdup(result[i]);
-    }
-    newEntry->result[count] = NULL; 
-
+    newEntry->query = strdup(query);   // Copiază interogarea
+    newEntry->result = strdup(result); // Copiază rezultatul
     newEntry->prev = NULL;
     newEntry->next = cache->head;
 
-    if (cache->head) cache->head->prev = newEntry;
+    if (cache->head)
+        cache->head->prev = newEntry;
     cache->head = newEntry;
 
-    if (!cache->tail) cache->tail = newEntry;
+    if (!cache->tail)
+        cache->tail = newEntry;
 
     cache->size++;
 
-    if (cache->size > CACHE_CAPACITY) {
+    // Dacă depășim capacitatea, eliminăm ultimul element (LRU)
+    if (cache->size > CACHE_CAPACITY)
+    {
         CacheEntry *toRemove = cache->tail;
 
-        if (toRemove->prev) toRemove->prev->next = NULL;
+        if (toRemove->prev)
+            toRemove->prev->next = NULL;
         cache->tail = toRemove->prev;
 
         free(toRemove->query);
-
-        for (int i = 0; toRemove->result[i] != NULL; i++) {
-            free(toRemove->result[i]);
-        }
         free(toRemove->result);
         free(toRemove);
 
@@ -85,17 +88,19 @@ void addToCache(Cache *cache, const char *query, char **result) {
     }
 }
 
-
-void clearCache(Cache *cache) {
+void clearCache(Cache *cache)
+{
     CacheEntry *current = cache->head;
 
-    while (current) {
+    while (current)
+    {
         CacheEntry *toDelete = current;
         current = current->next;
 
         free(toDelete->query);
 
-        for (int i = 0; toDelete->result[i] != NULL; i++) {
+        for (int i = 0; toDelete->result[i] != NULL; i++)
+        {
             free(toDelete->result[i]);
         }
         free(toDelete->result);

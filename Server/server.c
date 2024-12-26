@@ -11,7 +11,7 @@
 #include "cache.h"
 #include "threadPool.h"
 
-#define PORT 8126
+#define PORT 8127
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
@@ -156,8 +156,10 @@ bool executeSelectConditii(SQLParser *parser, char *buffer, char *titleTabel, Ta
     return true;
 }
 
-bool comportamentSelect(int clientSocket, char *buffer, Table *tabel, SQLParser *parser, char *titleTabel)
+bool comportamentSelect(int clientSocket, char *buffer, Table *tabel, SQLParser *parser, char *titleTabel, char *result)
 {
+    char result_aux[MAX_LENGTH];
+    char* result_aux_ptr;
     char *copie_buffer = strdup(buffer);
     char *token = strtok(buffer, "*");
     if (strcmp(token, "SELECT ") == 0)
@@ -172,9 +174,12 @@ bool comportamentSelect(int clientSocket, char *buffer, Table *tabel, SQLParser 
         }
         else
         {
+            strcpy(result_aux,"Nu s-a găsit un tabel în interogare.\n");
+            result_aux_ptr=strdup(result_aux);
             pthread_mutex_lock(&display_mutex);
             send(clientSocket, "Nu s-a găsit un tabel în interogare.\n", strlen("Nu s-a găsit un tabel în interogare.\n"), 0);
             printf("Nu s-a găsit un tabel în interogare.\n");
+            strcpy(result, result_aux_ptr);
             pthread_mutex_unlock(&display_mutex);
             return false;
         }
@@ -392,21 +397,26 @@ void handleClient(int clientSocket)
         { // SELECT
             pthread_rwlock_rdlock(&rwlock);
             CacheEntry *entry = findInCache(cache, buffer);
+            char *result=(char*)malloc(MAX_STRING_LENGTH);
             if (entry)
             {
                 pthread_mutex_lock(&display_mutex);
                 send(clientSocket, entry->result, strlen(entry->result), 0);
+                printf("%s",entry->result);
                 pthread_mutex_unlock(&display_mutex);
                 printf("Rezultatul SELECT a fost preluat din cache.\n");
             }
             else
             {
 
-                bool checking = comportamentSelect(clientSocket, buffer, tabel, parser, titleTabel);
+                bool checking = comportamentSelect(clientSocket, buffer, tabel, parser, titleTabel, result);
+                printf("REZULTAT TRECUT IN CACHE: %s", result);
+
                 if (!checking)
                 {
                     // a avut loc o eroare
                 }
+                addToCache(cache, buffer, result);
                 pthread_rwlock_unlock(&rwlock);
                 break;
             }

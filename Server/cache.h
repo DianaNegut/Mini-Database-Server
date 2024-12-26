@@ -6,7 +6,7 @@
 
 typedef struct CacheEntry {
     char *query;           
-    char **result;         
+    char *result;         
     struct CacheEntry *prev; 
     struct CacheEntry *next; 
 } CacheEntry;
@@ -21,7 +21,7 @@ typedef struct Cache {
 
 
 Cache *createCache();
-void addToCache(Cache *cache, const char *query, char **result);
+void addToCache(Cache *cache, const char *query, const char *result);
 CacheEntry *findInCache(Cache *cache, const char *query);
 void clearCache(Cache *cache);
 
