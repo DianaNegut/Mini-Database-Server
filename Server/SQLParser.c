@@ -210,39 +210,73 @@ bool exists_in_master(const char *master_filename, const char *entry)
 
 void append_to_file_values(const char *filename, char values[][MAX_LENGTH], int num_values)
 {
-    int fd = open(filename, O_WRONLY | O_APPEND);
-    if (fd == -1)
+
+    int fd_read = open(filename, O_RDONLY);
+    if (fd_read == -1)
     {
-        perror("Eroare la deschiderea fișierului");
+        perror("Eroare la deschiderea fișierului pentru citire");
         return;
     }
+
+    char buffer[MAX_LENGTH];
+    int lines = 0;
+    ssize_t bytesRead;
+    while ((bytesRead = read(fd_read, buffer, sizeof(buffer))) > 0)
+    {
+        for (ssize_t i = 0; i < bytesRead; i++)
+        {
+            if (buffer[i] == '\n')
+                lines++;
+        }
+    }
+
+    close(fd_read);
+
+    int fd_write = open(filename, O_WRONLY | O_APPEND);
+    if (fd_write == -1)
+    {
+        perror("Eroare la deschiderea fișierului pentru scriere");
+        return;
+    }
+    if (lines == 2)
+    {
+        if (write(fd_write, "\n", 1) == -1)
+        {
+            perror("Eroare la adăugarea newline-ului");
+            close(fd_write);
+            return;
+        }
+    }
+
+    // Scriem valorile în fișier
     for (int i = 0; i < num_values; i++)
     {
-        // Scriem valoarea în fișier
-        if (write(fd, values[i], strlen(values[i])) == -1)
+        if (write(fd_write, values[i], strlen(values[i])) == -1)
         {
             perror("Eroare la scrierea valorii în fișier");
-            close(fd);
+            close(fd_write);
             return;
         }
         if (i < num_values - 1)
         {
-            if (write(fd, " ", 1) == -1)
+            if (write(fd_write, " ", 1) == -1)
             {
                 perror("Eroare la adăugarea spațiului");
-                close(fd);
+                close(fd_write);
                 return;
             }
         }
-        write(fd, "\t", 1);
+        write(fd_write, "\t", 1);
     }
-    if (write(fd, "\n", 1) == -1)
+
+    if (write(fd_write, "\n", 1) == -1)
     {
         perror("Eroare la adăugarea newline-ului");
-        close(fd);
+        close(fd_write);
         return;
     }
-    if (close(fd) == -1)
+
+    if (close(fd_write) == -1)
     {
         perror("Eroare la închiderea fișierului");
     }
@@ -419,7 +453,7 @@ void parseUpdate(SQLParser *parser, char *stream, char *tableName, char *setcol,
         exit(-1);
     }
     strncpy(setcol, token, strlen(token) - 1);
-    setcol[strlen(token) - 1] = '\0';
+    setcol[strlen(token) ] = '\0';
 
     token = strtok(NULL, " ");
     if (token == NULL)

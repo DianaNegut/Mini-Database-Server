@@ -11,7 +11,7 @@
 #include "cache.h"
 #include "threadPool.h"
 
-#define PORT 8127
+#define PORT 8128
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
@@ -37,9 +37,9 @@ bool executeSelectTotal(int clientSocket, Table *tabel, char *nume_tabel, char *
     sscanf(from_ptr + 5, "%s", nume_tabel);
     char buffer_auxiliar[BUFFER_SIZE];
     pthread_mutex_lock(&display_mutex);
-    snprintf(buffer_auxiliar, strlen(buffer_auxiliar), "Numele tabelului este: %s\n", nume_tabel);
+    snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[35mNumele tabelului este: %s\033[0m\n", nume_tabel);
     send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-    printf("Numele tabelului este: %s\n", nume_tabel);
+    printf("\033[35mNumele tabelului este: %s\033[0m\n", nume_tabel);
     pthread_mutex_unlock(&display_mutex);
     tabel = loadTable(nume_tabel);
     pthread_mutex_lock(&display_mutex);
@@ -139,8 +139,12 @@ bool executeSelectConditii(SQLParser *parser, char *buffer, char *titleTabel, Ta
     else
     {
         pthread_mutex_lock(&display_mutex);
-        printf("Operator necunoscut in clauza WHERE\n");
-        send(clientSocket, "Operator necunoscut în clauza WHERE\n", strlen("Operator necunoscut în clauza WHERE\n"), 0);
+        printf("\033[31mOperator necunoscut in clauza WHERE\n\033[0m");
+
+        char coloredMessage[1024];
+        snprintf(coloredMessage, sizeof(coloredMessage), "\033[31mOperator necunoscut în clauza WHERE\n\033[0m");
+        send(clientSocket, coloredMessage, strlen(coloredMessage), 0);
+
         pthread_mutex_unlock(&display_mutex);
         return false;
     }
@@ -159,7 +163,7 @@ bool executeSelectConditii(SQLParser *parser, char *buffer, char *titleTabel, Ta
 bool comportamentSelect(int clientSocket, char *buffer, Table *tabel, SQLParser *parser, char *titleTabel, char *result)
 {
     char result_aux[MAX_LENGTH];
-    char* result_aux_ptr;
+    char *result_aux_ptr;
     char *copie_buffer = strdup(buffer);
     char *token = strtok(buffer, "*");
     if (strcmp(token, "SELECT ") == 0)
@@ -174,12 +178,16 @@ bool comportamentSelect(int clientSocket, char *buffer, Table *tabel, SQLParser 
         }
         else
         {
-            strcpy(result_aux,"Nu s-a găsit un tabel în interogare.\n");
-            result_aux_ptr=strdup(result_aux);
+            strcpy(result_aux, "\033[31mNu s-a găsit un tabel în interogare.\n\033[0m");
+            result_aux_ptr = strdup(result_aux);
+
             pthread_mutex_lock(&display_mutex);
-            send(clientSocket, "Nu s-a găsit un tabel în interogare.\n", strlen("Nu s-a găsit un tabel în interogare.\n"), 0);
-            printf("Nu s-a găsit un tabel în interogare.\n");
+            send(clientSocket, "\033[31mNu s-a găsit un tabel în interogare.\n\033[0m", strlen("\033[31mNu s-a găsit un tabel în interogare.\n\033[0m"), 0);
+            printf("\033[31mNu s-a găsit un tabel în interogare.\n\033[0m");
+            pthread_mutex_unlock(&display_mutex);
+
             strcpy(result, result_aux_ptr);
+
             pthread_mutex_unlock(&display_mutex);
             return false;
         }
@@ -228,9 +236,11 @@ bool comportamentUpdate(SQLParser *parser, char *buffer, char *tableName, Table 
             int row = searched[i]->row;
 
             char buffer_auxiliar[BUFSIZ];
-            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[32mDin coloana %s schimbam elementul %s de pe randul %d\n\033[0m", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
             send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-            printf("Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+
+            printf("\033[32mDin coloana %s schimbam elementul %s de pe randul %d\n\033[0m", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+
             tabel->randuri[row].elemente[setColIndex] = setval;
         }
         scrieTabelInFisier(tableName, tabel);
@@ -243,9 +253,9 @@ bool comportamentUpdate(SQLParser *parser, char *buffer, char *tableName, Table 
         {
             int row = searched[i]->row;
             char buffer_auxiliar[BUFSIZ];
-            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[32mDin coloana %s schimbam elementul %s de pe randul %d\n\033[0m", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
             send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-            printf("Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+            printf("\033[32mDin coloana %s schimbam elementul %s de pe randul %d\n\033[0m", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
             tabel->randuri[row].elemente[setColIndex] = setval;
         }
         scrieTabelInFisier(tableName, tabel);
@@ -258,9 +268,13 @@ bool comportamentUpdate(SQLParser *parser, char *buffer, char *tableName, Table 
         {
             int row = searched[i]->row;
             char buffer_auxiliar[BUFSIZ];
-            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[32mDin coloana %s schimbam elementul %s de pe randul %d\n\033[0m",
+                     setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
             send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-            printf("Din coloana %s schimbam elementul %s de pe randul %d\n", setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+
+            printf("\033[32mDin coloana %s schimbam elementul %s de pe randul %d\n\033[0m",
+                   setcol, tabel->randuri[row].elemente[setColIndex], row + 1);
+
             tabel->randuri[row].elemente[setColIndex] = setval;
         }
         scrieTabelInFisier(tableName, tabel);
@@ -268,9 +282,11 @@ bool comportamentUpdate(SQLParser *parser, char *buffer, char *tableName, Table 
     else
     {
         char buffer_auxiliar[BUFSIZ];
-        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Operator necunoscut in clauza WHERE\n");
+        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[31mOperator necunoscut in clauza WHERE\n\033[0m");
         send(clientSocket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-        printf("Operator necunoscut in clauza WHERE\n");
+
+        printf("\033[31mOperator necunoscut in clauza WHERE\n\033[0m");
+
         pthread_rwlock_wrlock(&rwlock);
         return false;
     }
@@ -344,9 +360,11 @@ bool comportamentDelete(SQLParser *parser, char *buffer, char *tableName, int cl
     else
     {
         char buffer_auxiliar[BUFSIZ];
-        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Operator necunoscut in clauza WHERE\n");
+        snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[31mOperator necunoscut in clauza WHERE\n\033[0m");
         send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-        printf("Operator necunoscut in clauza WHERE\n");
+
+        printf("\033[31mOperator necunoscut in clauza WHERE\n\033[0m");
+
         pthread_rwlock_unlock(&rwlock);
         return false;
     }
@@ -361,7 +379,7 @@ void handleClient(int clientSocket)
     SQLParser *parser = (SQLParser *)malloc(sizeof(SQLParser));
     if (parser == NULL)
     {
-        printf("Eroare la alocarea memoriei pentru SQLParser.\n");
+        printf("\033[31mEroare la alocarea memoriei pentru SQLParser.\n\033[0m");
         return;
     }
     initSQLParser(parser);
@@ -382,12 +400,13 @@ void handleClient(int clientSocket)
         {
             buffer[len - 1] = '\0';
         }
-        printf("BUFFERUL INAINTE DE PRELUCRARE ESTE: %s\n", buffer);
+        printf("\033[32mBUFFERUL INAINTE DE PRELUCRARE ESTE: %s\n\033[0m", buffer);
+
         char tableName[40];
         int switching = parser->parse(parser, buffer);
         if (strcmp(buffer, "QUIT") == 0)
         {
-            printf("Clientul a trimis comanda QUIT. Se închide conexiunea.\n");
+            printf("\033[35mClientul a trimis comanda QUIT. Se închide conexiunea.\n\033[0m");
             break;
         }
 
@@ -397,12 +416,12 @@ void handleClient(int clientSocket)
         { // SELECT
             pthread_rwlock_rdlock(&rwlock);
             CacheEntry *entry = findInCache(cache, buffer);
-            char *result=(char*)malloc(MAX_STRING_LENGTH);
+            char *result = (char *)malloc(MAX_STRING_LENGTH);
             if (entry)
             {
                 pthread_mutex_lock(&display_mutex);
                 send(clientSocket, entry->result, strlen(entry->result), 0);
-                printf("%s",entry->result);
+                printf("%s", entry->result);
                 pthread_mutex_unlock(&display_mutex);
                 printf("Rezultatul SELECT a fost preluat din cache.\n");
             }
@@ -410,7 +429,7 @@ void handleClient(int clientSocket)
             {
 
                 bool checking = comportamentSelect(clientSocket, buffer, tabel, parser, titleTabel, result);
-                printf("REZULTAT TRECUT IN CACHE: %s", result);
+                printf("\033[33mREZULTAT TRECUT IN CACHE: %s\033[0m", result);
 
                 if (!checking)
                 {
@@ -457,27 +476,122 @@ void handleClient(int clientSocket)
         }
         default:
             char buffer_auxiliar[BUFSIZ];
-            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "Comandă necunoscută: %s\n", buffer);
+            snprintf(buffer_auxiliar, sizeof(buffer_auxiliar), "\033[31mComandă necunoscută: %s\n\033[0m", buffer);
             send(socket, buffer_auxiliar, strlen(buffer_auxiliar), 0);
-            printf("Comandă necunoscută: %s\n", buffer);
+
+            printf("\033[31mComandă necunoscută: %s\n\033[0m", buffer);
+
             break;
         }
     }
     free(parser);
-    printf("Se inchide conexiunea!\n");
+    printf("\033[31mSe inchide conexiunea!\n\033[0m");
     close(clientSocket);
 }
 
-int main()
+void readMasterFile(const char *masterFilename, char files[][1024], int *fileCount)
 {
+    FILE *masterFile = fopen(masterFilename, "r");
+    if (!masterFile)
+    {
+        perror("Eroare la deschiderea fișierului master");
+        return;
+    }
+
+    char line[1024];
+    *fileCount = 0;
+
+    while (fgets(line, sizeof(line), masterFile))
+    {
+        line[strcspn(line, "\n")] = 0;
+        strcpy(files[*fileCount], line);
+        (*fileCount)++;
+    }
+
+    fclose(masterFile);
+}
+
+void copyFile(const char *source, const char *destination)
+{
+    FILE *src = fopen(source, "r");
+    if (!src)
+    {
+        perror("Eroare la deschiderea fișierului sursă");
+        return;
+    }
+
+    FILE *dst = fopen(destination, "w");
+    if (!dst)
+    {
+        perror("Eroare la deschiderea fișierului destinație");
+        fclose(src);
+        return;
+    }
+
+    char buffer[1024];
+    size_t bytesRead;
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), src)) > 0)
+    {
+        fwrite(buffer, 1, bytesRead, dst);
+    }
+
+    fclose(src);
+    fclose(dst);
+}
+void *backupThread(void *arg)
+{
+    const char *masterFilename = "master";
+    const char *backupDir = "backup";
+
+    while (1)
+    {
+        struct stat st = {0};
+        if (stat(backupDir, &st) == -1)
+        {
+            if (mkdir(backupDir, 0755) < 0)
+            {
+                perror("Eroare la crearea directorului de backup");
+                sleep(300);
+                continue;
+            }
+        }
+
+        // Citește fișierele din fișierul master
+        char files[100][1024];
+        int fileCount = 0;
+        readMasterFile(masterFilename, files, &fileCount);
+
+        // Copiază fiecare fișier în directorul backup
+        for (int i = 0; i < fileCount; i++)
+        {
+            char backupPath[1024];
+            snprintf(backupPath, sizeof(backupPath), "%s/%s", backupDir, files[i]);
+
+            // Copiază fișierul
+            copyFile(files[i], backupPath);
+        }
+
+        // Așteaptă 5 minute
+        sleep(300);
+    }
+
+    return NULL;
+}
+
+int main() {
     int serverSocket, clientSocket;
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t addr_size;
     cache = createCache();
 
+    pthread_t backup_tid;
+    if (pthread_create(&backup_tid, NULL, backupThread, NULL) != 0) {
+        perror("Eroare la crearea thread-ului de backup");
+        exit(EXIT_FAILURE);
+    }
+
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0)
-    {
+    if (serverSocket < 0) {
         perror("Eroare la crearea socket-ului");
         exit(EXIT_FAILURE);
     }
@@ -486,36 +600,40 @@ int main()
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = htons(PORT);
 
-    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0)
-    {
+    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+        fprintf(stderr, "\033[31m");
         perror("Eroare la legarea socket-ului");
+        fprintf(stderr, "\033[0m");
+
         close(serverSocket);
         exit(EXIT_FAILURE);
     }
 
-    if (listen(serverSocket, 10) < 0)
-    {
+    if (listen(serverSocket, 10) < 0) {
+        fprintf(stderr, "\033[31m");
         perror("Eroare la ascultarea socket-ului");
+        fprintf(stderr, "\033[0m");
+
         close(serverSocket);
         exit(EXIT_FAILURE);
     }
 
     ThreadPool *pool = createThreadPool(THREAD_COUNT);
-    if (!pool)
-    {
+    if (!pool) {
+        fprintf(stderr, "\033[31m");
         perror("Eroare la crearea thread pool-ului");
+        fprintf(stderr, "\033[0m");
+
         close(serverSocket);
         exit(EXIT_FAILURE);
     }
 
-    printf("Serverul este in asteptare...\n");
+    printf("\033[34mServerul este in asteptare...\n\033[0m");
 
-    while (1)
-    {
+    while (1) {
         addr_size = sizeof(clientAddr);
         clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &addr_size);
-        if (clientSocket < 0)
-        {
+        if (clientSocket < 0) {
             perror("Eroare la acceptarea clientului");
             continue;
         }
@@ -525,9 +643,9 @@ int main()
         ClientTask *task = (ClientTask *)malloc(sizeof(ClientTask));
         task->clientSocket = clientSocket;
 
-        if (addTaskToPool(pool, handleClientWrapper, task) < 0)
-        {
-            printf("Thread pool este plin. Client respins.\n");
+        if (addTaskToPool(pool, handleClientWrapper, task) < 0) {
+            printf("\033[31mThread pool este plin. Client respins.\n\033[0m");
+
             close(clientSocket);
             free(task);
         }
@@ -536,5 +654,9 @@ int main()
     destroyThreadPool(pool);
     pthread_rwlock_destroy(&rwlock);
     close(serverSocket);
+
+    pthread_cancel(backup_tid);
+    pthread_join(backup_tid, NULL);
+
     return 0;
 }

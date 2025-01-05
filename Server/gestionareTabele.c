@@ -17,7 +17,6 @@
 
 pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-
 bool columnsEqual(Column *col1, Column *col2)
 {
     return strcmp(col1->numeColoana, col2->numeColoana) == 0;
@@ -66,62 +65,91 @@ Column *getColumnByName(Table *table, const char *name)
 
 void afiseazaTabel(Table *tabel, int clientSocket)
 {
-    //pthread_mutex_lock(&print_mutex);
-    printf("-----------------------------------------------------------\n");
-    send(clientSocket, "-----------------------------------------------------------\n", strlen("-----------------------------------------------------------\n"), 0);
-    send(clientSocket, "| ", strlen("| "), 0);
-    printf("| ");
+    // pthread_mutex_lock(&print_mutex);
+    printf("\033[32m-----------------------------------------------------------\033[0m\n");
+    send(clientSocket, "\033[32m-----------------------------------------------------------\033[0m\n",
+         strlen("\033[32m-----------------------------------------------------------\033[0m\n"), 0);
+    send(clientSocket, "\033[32m| \033[0m", strlen("\033[32m| \033[0m"), 0);
+    printf("\033[32m| \033[0m");
+
     for (int i = 0; i < tabel->numarColoane; i++)
     {
-        printf("%s\t|", tabel->coloane[i].numeColoana);
-        send(clientSocket, tabel->coloane[i].numeColoana, strlen(tabel->coloane[i].numeColoana), 0);
-        send(clientSocket, "\t|", strlen("\t|"), 0);
+        printf("\033[31m%s\t|\033[0m", tabel->coloane[i].numeColoana);
+
+        char coloredColumn[1024];
+        snprintf(coloredColumn, sizeof(coloredColumn), "\033[33m%s\033[0m", tabel->coloane[i].numeColoana);
+        send(clientSocket, coloredColumn, strlen(coloredColumn), 0);
+        send(clientSocket, "\033[33m\t|\033[0m", strlen("\033[33m\t|\033[0m"), 0);
     }
-    printf("\n-----------------------------------------------------------\n");
-    send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
-    //pthread_mutex_unlock(&print_mutex);
-    //send(clientSocket,"SUNT AICI", strlen("SUNT AICI"), 0);
+    printf("\033[32m\n-----------------------------------------------------------\n\033[0m");
+    send(clientSocket, "\033[32m\n-----------------------------------------------------------\n\033[0m",
+         strlen("\033[32m\n-----------------------------------------------------------\n\033[0m"), 0);
+
+    // pthread_mutex_unlock(&print_mutex);
+    // send(clientSocket,"SUNT AICI", strlen("SUNT AICI"), 0);
     for (int i = 0; i < tabel->numarRanduri; i++)
     {
-        printf("| ");
+        printf("\033[32m| \033[0m");
         for (int j = 0; j < tabel->numarColoane; j++)
         {
-            //pthread_mutex_lock(&print_mutex);
-            printf(" %s\t|", tabel->randuri[i].elemente[j]);
-            send(clientSocket, tabel->randuri[i].elemente[j], strlen(tabel->randuri[i].elemente[j]), 0);
-            send(clientSocket, "\t|", strlen("\t|"), 0);
+            // pthread_mutex_lock(&print_mutex);
+            printf("\033[34m %s\t|\033[0m", tabel->randuri[i].elemente[j]);
+
+            char coloredValue[1024];
+            snprintf(coloredValue, sizeof(coloredValue), "\033[34m%s\033[0m", tabel->randuri[i].elemente[j]);
+            send(clientSocket, coloredValue, strlen(coloredValue), 0);
+            send(clientSocket, "\033[34m\t|\033[0m", strlen("\033[34m\t|\033[0m"), 0);
         }
-        send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
-        printf("\n-----------------------------------------------------------\n");
+        send(clientSocket, "\033[32m\n-----------------------------------------------------------\n\033[0m",
+             strlen("\033[32m\n-----------------------------------------------------------\n\033[0m"), 0);
+        printf("\033[32m\n-----------------------------------------------------------\n\033[0m");
     }
-    //pthread_mutex_unlock(&print_mutex);
+    // pthread_mutex_unlock(&print_mutex);
 }
 
-void afisare_nice(int clientSocket, Table* tabel, char** coloane, int nrcols, int* colindexes, BSTNode** searched, int nrfound){
-    printf("-----------------------------------------------------------\n");
-    send(clientSocket, "-----------------------------------------------------------\n", strlen("-----------------------------------------------------------\n"), 0);
-    send(clientSocket, "| ", strlen("| "), 0);
-    printf("| ");
-    for(int i = 0; i < nrcols; i++){
-        printf("%s\t|", coloane[i]);
-        send(clientSocket, "%s\t|", coloane[i], strlen(coloane[i]), 0);
+void afisare_nice(int clientSocket, Table *tabel, char **coloane, int nrcols, int *colindexes, BSTNode **searched, int nrfound)
+{
+    printf("\033[32m-----------------------------------------------------------\n\033[0m");
+    send(clientSocket, "\033[32m-----------------------------------------------------------\n\033[0m",
+         strlen("\033[32m-----------------------------------------------------------\n\033[0m"), 0);
+
+    send(clientSocket, "\033[32m| \033[0m", strlen("\033[32m| \033[0m"), 0);
+    printf("\033[32m| \033[0m");
+
+    for (int i = 0; i < nrcols; i++)
+    {
+        printf("\033[33m%s\t|\033[0m", coloane[i]);
+
+        char coloredColumn[1024];
+        snprintf(coloredColumn, sizeof(coloredColumn), "\033[33m%s\t|\033[0m", coloane[i]);
+        send(clientSocket, coloredColumn, strlen(coloredColumn), 0);
     }
 
-    printf("\n-----------------------------------------------------------\n");
-    send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
-    send(clientSocket, "| ", strlen("| "), 0);
-    printf("| ");
-    for(int i = 0; i < nrfound; i++){
-        for(int j = 0; j < nrcols; j++){
+    printf("\033[32m\n-----------------------------------------------------------\n\033[0m");
+    send(clientSocket, "\033[32m\n-----------------------------------------------------------\n\033[0m",
+         strlen("\033[32m\n-----------------------------------------------------------\n\033[0m"), 0);
+
+    send(clientSocket, "\033[32m| \033[0m", strlen("\033[32m| \033[0m"), 0);
+    printf("\033[32m| \033[0m");
+
+    for (int i = 0; i < nrfound; i++)
+    {
+        for (int j = 0; j < nrcols; j++)
+        {
             int row = searched[i]->row;
-            printf("%s\t|", tabel->randuri[row].elemente[colindexes[j]]);
-            send(clientSocket, "%s\t|", tabel->randuri[row].elemente[colindexes[j]], strlen(tabel->randuri[row].elemente[colindexes[j]]), 0);
+            printf("\033[34m%s\t|\033[0m", tabel->randuri[row].elemente[colindexes[j]]);
+
+            char coloredValue[1024];
+            snprintf(coloredValue, sizeof(coloredValue), "\033[34m%s\t|\033[0m", tabel->randuri[row].elemente[colindexes[j]]);
+            send(clientSocket, coloredValue, strlen(coloredValue), 0);
         }
-        printf("\n-----------------------------------------------------------\n");
-        send(clientSocket, "\n-----------------------------------------------------------\n", strlen("\n-----------------------------------------------------------\n"), 0);
-        send(clientSocket, "| ", strlen("| "), 0);
-        if(nrfound - i > 1)
-            printf("| ");
+        printf("\033[32m\n-----------------------------------------------------------\n\033[0m");
+        send(clientSocket, "\033[32m\n-----------------------------------------------------------\n\033[0m",
+             strlen("\033[32m\n-----------------------------------------------------------\n\033[0m"), 0);
+
+        send(clientSocket, "\033[32m| \033[0m", strlen("\033[32m| \033[0m"), 0);
+        if (nrfound - i > 1)
+            printf("\033[32m| \033[0m");
     }
 }
 
@@ -232,6 +260,7 @@ int citesteInt(int fd)
 
 void salveazaTabel(Table *tabel, const char *filename)
 {
+
     int file = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
     if (file < 0)
     {
@@ -243,7 +272,16 @@ void salveazaTabel(Table *tabel, const char *filename)
     for (int i = 0; i < tabel->numarColoane; i++)
     {
         fileSize += strlen(tabel->coloane[i].numeColoana) + 1;
-        fileSize += strlen(tabel->coloane[i].tipDate) + 1;
+        if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
+        {
+            char varcharLengthStr[20];
+            snprintf(varcharLengthStr, sizeof(varcharLengthStr), "(%d)", tabel->coloane[i].varchar_length);
+            fileSize += strlen("VARCHAR") + strlen(varcharLengthStr) + 1;
+        }
+        else
+        {
+            fileSize += strlen(tabel->coloane[i].tipDate) + 1;
+        }
     }
     fileSize += 1;
     for (int i = 0; i < tabel->numarRanduri; i++)
@@ -251,7 +289,6 @@ void salveazaTabel(Table *tabel, const char *filename)
         for (int j = 0; j < tabel->numarColoane; j++)
         {
             fileSize += strlen(tabel->randuri[i].elemente[j]) + 1;
-            fileSize += 1;
         }
         fileSize += 1;
     }
@@ -288,24 +325,30 @@ void salveazaTabel(Table *tabel, const char *filename)
         ptr += len;
         *ptr++ = ' ';
 
-        const char *tip;
-        if (strcmp(tabel->coloane[i].tipDate, "INT") == 0)
-            tip = "INT";
-        else if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
+        if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
         {
-            tip = "VARCHAR";
-        }
-        else if (strcmp(tabel->coloane[i].tipDate, "DATE") == 0)
-            tip = "DATE";
-        else
-            tip = "UNKNOWN";
+            const char *tip = "VARCHAR";
+            len = strlen(tip);
+            memcpy(ptr, tip, len);
+            ptr += len;
 
-        len = strlen(tip);
-        memcpy(ptr, tip, len);
-        ptr += len;
+            char varcharLengthStr[20];
+            snprintf(varcharLengthStr, sizeof(varcharLengthStr), "(%d)", tabel->coloane[i].varchar_length);
+            len = strlen(varcharLengthStr);
+            memcpy(ptr, varcharLengthStr, len);
+            ptr += len;
+        }
+        else
+        {
+            const char *tip = tabel->coloane[i].tipDate;
+            len = strlen(tip);
+            memcpy(ptr, tip, len);
+            ptr += len;
+        }
         *ptr++ = '\t';
     }
     *ptr++ = '\n';
+
     for (int i = 0; i < tabel->numarRanduri; i++)
     {
         for (int j = 0; j < tabel->numarColoane; j++)
@@ -317,7 +360,6 @@ void salveazaTabel(Table *tabel, const char *filename)
         }
         *ptr++ = '\n';
     }
-    //*ptr++ = '\0';
 
     if (msync(map, fileSize, MS_SYNC) < 0)
     {
@@ -552,43 +594,46 @@ int countLinesInFile(const char *filename)
 
 void scrieTabelInFisier(const char *numeFisier, Table *tabel)
 {
+
     FILE *fisier = fopen(numeFisier, "w");
     if (fisier == NULL)
     {
-        perror("Eroare la deschiderea fișierului.");
+        perror("Eroare la deschiderea fișierului pentru scriere");
         return;
     }
 
+    // Scrierea numelui tabelului
     fprintf(fisier, "%s\n", tabel->numeTabel);
 
+    // Scrierea numărului de coloane
     fprintf(fisier, "%d\n", tabel->numarColoane);
 
+    // Scrierea detaliilor coloanelor
     for (int i = 0; i < tabel->numarColoane; i++)
     {
-        fprintf(fisier, "%s %s", tabel->coloane[i].numeColoana, tabel->coloane[i].tipDate);
         if (strcmp(tabel->coloane[i].tipDate, "VARCHAR") == 0)
         {
-            fprintf(fisier, "(%d)", tabel->coloane[i].varchar_length);
+            fprintf(fisier, "%s VARCHAR(%d)\t", tabel->coloane[i].numeColoana, tabel->coloane[i].varchar_length);
         }
-        if (i < tabel->numarColoane - 1)
+        else
         {
-            fprintf(fisier, "\t");
+            fprintf(fisier, "%s %s\t", tabel->coloane[i].numeColoana, tabel->coloane[i].tipDate);
         }
     }
     fprintf(fisier, "\n");
 
+    // Scrierea rândurilor
     for (int i = 0; i < tabel->numarRanduri; i++)
     {
         for (int j = 0; j < tabel->numarColoane; j++)
         {
             fprintf(fisier, "%s\t", tabel->randuri[i].elemente[j]);
         }
-        if (i < tabel->numarRanduri - 1)
-            fprintf(fisier, "\n");
+        fprintf(fisier, "\n");
     }
 
+    // Închiderea fișierului
     fclose(fisier);
-    printf("Tabelul a fost actualizat în fișierul %s.\n", numeFisier);
 }
 
 void stergeRand(Table *tabel, int indexRand)
