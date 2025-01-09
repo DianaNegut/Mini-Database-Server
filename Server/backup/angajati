@@ -1,6 +1,6 @@
 angajati
 4
-id INT  nume VARCHAR(10)   varsta INT   salariu INT
-1	"Ion Popescu"	30	3500
-2	"X Y"	20	3
-3 	"ANA m" 	30 	5000	
+id INT	nume VARCHAR(10)	varsta INT	salariu INT	
+0	"Ion Popescu"	30	100	
+0	"Diana"	20	3	
+0	"ANA m"	30	100	

@@ -11,7 +11,7 @@
 #include "cache.h"
 #include "threadPool.h"
 
-#define PORT 8127
+#define PORT 8125
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
@@ -571,23 +571,15 @@ void *backupThread(void *arg)
                 continue;
             }
         }
-
-        // Citește fișierele din fișierul master
         char files[100][1024];
         int fileCount = 0;
         readMasterFile(masterFilename, files, &fileCount);
-
-        // Copiază fiecare fișier în directorul backup
         for (int i = 0; i < fileCount; i++)
         {
             char backupPath[1024];
             snprintf(backupPath, sizeof(backupPath), "%s/%s", backupDir, files[i]);
-
-            // Copiază fișierul
             copyFile(files[i], backupPath);
         }
-
-        // Așteaptă 5 minute
         sleep(300);
     }
 
