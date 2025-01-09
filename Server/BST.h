@@ -23,5 +23,6 @@ void collectNodesExcluding(BSTNode *root, BSTNode ***nodes, int *count, int *siz
 BSTNode **getNodesExcluding(BSTNode *root, char *excludeValue, int *count);
 BSTNode **getNodesByCondition(BSTNode *root, char *value, char *operator, int *count);
 void collectNodesByCondition(BSTNode *root, char *value, char *operator, BSTNode ***result, int *count, int *size);
+void freeBST(BSTNode *node);
 
 #endif //BST

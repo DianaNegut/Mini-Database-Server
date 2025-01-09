@@ -11,7 +11,7 @@
 #include "cache.h"
 #include "threadPool.h"
 
-#define PORT 8128
+#define PORT 8127
 #define BUFFER_SIZE 1024
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 10
@@ -290,6 +290,22 @@ bool comportamentUpdate(SQLParser *parser, char *buffer, char *tableName, Table 
         pthread_rwlock_wrlock(&rwlock);
         return false;
     }
+    free(wherecol);
+    free(whereval);
+    free(whereop);
+    free(setcol);
+    free(setval);
+    freeBST(root);
+    // for(int i = 0; i < found; i++)
+    //     freeBST(searched[i]);
+    // free(searched);
+    //freeBST(*searched);
+    // free(col);
+    // free(root);
+    // free(elemente);
+    // free(colIndex);
+    // free(rowIndex);
+    // free(searched);
     return true;
 }
 

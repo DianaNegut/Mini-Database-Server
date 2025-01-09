@@ -148,4 +148,19 @@ BSTNode **getNodesByCondition(BSTNode *root, char *value, char *operator, int *c
     return result;
 }
 
+#include <stdlib.h>
+
+void freeBST(BSTNode *node) {
+    if (node == NULL) {
+        return; 
+    }
+    freeBST(node->left);
+    freeBST(node->right);
+
+    if (node->word != NULL) {
+        free(node->word);
+    }
+
+    free(node);
+}
 

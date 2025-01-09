@@ -453,7 +453,7 @@ void parseUpdate(SQLParser *parser, char *stream, char *tableName, char *setcol,
         exit(-1);
     }
     strncpy(setcol, token, strlen(token) - 1);
-    setcol[strlen(token) ] = '\0';
+    setcol[strlen(token) - 1] = '\0';
 
     token = strtok(NULL, " ");
     if (token == NULL)
